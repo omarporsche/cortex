@@ -128,6 +128,54 @@
     </div>
   </div>
 
+  <!-- VIEW: ONBOARDING -->
+  <div id="view-onboarding" style="display:none;">
+    <h1>Velkommen til Cortex</h1>
+    <p class="sub">Fortæl lidt om dig selv, før du kommer i gang</p>
+    <div class="panel">
+      <input type="text" id="onboardName" placeholder="Dit navn"
+        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;">
+      <select id="onboardSemester"
+        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;"></select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:14px;">
+        <input type="checkbox" id="onboardShowEmail"> Vis min email på sæt, jeg opretter
+      </label>
+      <button onclick="submitOnboarding()">Gem og fortsæt</button>
+      <div id="onboardErrorBox"></div>
+    </div>
+  </div>
+
+  <!-- VIEW: PROFILE -->
+  <div id="view-profile" style="display:none;">
+    <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
+    <h1>Min profil</h1>
+    <div class="panel">
+      <input type="text" id="profileName" placeholder="Dit navn"
+        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;">
+      <p style="font-size:13px;opacity:0.6;margin:0 0 8px;">Email: <span id="profileEmailText"></span></p>
+      <select id="profileSemester"
+        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;"></select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:8px;">
+        <input type="checkbox" id="profileShowEmail"> Vis min email på sæt, jeg opretter
+      </label>
+      <div class="row" style="margin-top:0;">
+        <span></span>
+        <button onclick="saveProfile()">Gem ændringer</button>
+      </div>
+      <div id="profileStatusBox"></div>
+      <div id="profileErrorBox"></div>
+    </div>
+
+    <div class="sem-group">
+      <h3>Dine oprettede sæt</h3>
+      <div id="myDecksList"></div>
+    </div>
+  </div>
+
   <!-- VIEW: SEMESTER PICKER -->
   <div id="view-semester" style="display:none;">
     <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
@@ -349,6 +397,7 @@ const SEMESTERS = {
 
 let cards = [];
 let currentUser = null;
+let currentProfile = null;
 let authMode = 'login';
 let apiKey = localStorage.getItem('medikort_api_key') || '';
 let currentSemester = null;
@@ -363,7 +412,7 @@ function buildSemesterGrids(){
     '<button class="sem-btn" onclick="selectSemester(\'' + id + '\')">' + SEMESTERS[id] + '</button>').join('');
 }
 
-const ALL_VIEWS = ['home','auth','semester','decks','app','about','contact','privacy'];
+const ALL_VIEWS = ['home','auth','onboarding','profile','semester','decks','app','about','contact','privacy'];
 
 function showView(name){
   ALL_VIEWS.forEach(v => {
@@ -464,7 +513,7 @@ async function createUserDeck(){
   for(let attempt = 0; attempt < 5; attempt++){
     const code = generateShareCode();
     const { data, error } = await sb.from('decks').insert({
-      semester: currentSemester, type: 'user', name: name, share_code: code
+      semester: currentSemester, type: 'user', name: name, share_code: code, created_by: currentUser.id
     }).select().single();
     if(!error){ openDeck(data); return; }
     if(error.code !== '23505'){
@@ -475,7 +524,7 @@ async function createUserDeck(){
   errBox.innerHTML = '<div class="error">Kunne ikke generere en unik delekode. Prøv igen.</div>';
 }
 
-function openDeck(deck){
+async function openDeck(deck){
   currentDeck = deck;
   currentSemester = deck.semester;
   localStorage.setItem('cortex_current_deck', JSON.stringify(deck));
@@ -487,7 +536,18 @@ function openDeck(deck){
   const shareBox = document.getElementById('shareCodeBox');
   if(deck.type === 'user'){
     shareBox.style.display = 'block';
-    shareBox.innerHTML = 'Delekode til dette sæt: <strong>' + escapeHtml(deck.share_code) + '</strong> — del den med dine venner.';
+    let html = 'Delekode til dette sæt: <strong>' + escapeHtml(deck.share_code) + '</strong> — del den med dine venner.';
+    shareBox.innerHTML = html;
+    if(deck.created_by && isConfigured()){
+      try{
+        const { data: creator } = await sb.from('profiles').select('*').eq('id', deck.created_by).maybeSingle();
+        if(creator && creator.full_name){
+          html += '<br>Oprettet af ' + escapeHtml(creator.full_name) +
+            (creator.email ? ' (' + escapeHtml(creator.email) + ')' : '');
+          shareBox.innerHTML = html;
+        }
+      }catch(e){}
+    }
   }else{
     shareBox.style.display = 'none';
   }
@@ -512,6 +572,7 @@ function renderAuthBar(){
   if(!bar) return;
   if(currentUser){
     bar.innerHTML = 'Logget ind som ' + escapeHtml(currentUser.email) +
+      ' &middot; <a href="#" onclick="openProfileView();return false;" style="color:var(--accent);">Min profil</a>' +
       ' &middot; <a href="#" onclick="logOut();return false;" style="color:var(--accent);">Log ud</a>';
   }else{
     bar.innerHTML = '<a href="#" onclick="openAuthView();return false;" style="color:var(--accent);">Log ind / opret konto</a>';
@@ -569,9 +630,14 @@ async function submitAuth(){
       if(error) throw error;
       if(data.session){
         currentUser = data.session.user;
+        await loadProfileForCurrentUser();
         renderAuthBar();
-        statusBox.innerHTML = '<div class="status">Konto oprettet — du er logget ind.</div>';
-        setTimeout(goHome, 800);
+        if(!currentProfile){
+          openOnboarding();
+        }else{
+          statusBox.innerHTML = '<div class="status">Konto oprettet — du er logget ind.</div>';
+          setTimeout(goHome, 800);
+        }
       }else{
         statusBox.innerHTML = '<div class="status">Konto oprettet. Tjek din email for at bekræfte den, log derefter ind.</div>';
       }
@@ -579,9 +645,14 @@ async function submitAuth(){
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if(error) throw error;
       currentUser = data.user;
+      await loadProfileForCurrentUser();
       renderAuthBar();
-      statusBox.innerHTML = '<div class="status">Logget ind.</div>';
-      setTimeout(goHome, 500);
+      if(!currentProfile){
+        openOnboarding();
+      }else{
+        statusBox.innerHTML = '<div class="status">Logget ind.</div>';
+        setTimeout(goHome, 500);
+      }
     }
   }catch(e){
     errBox.innerHTML = '<div class="error">' + (e.message || 'Noget gik galt') + '</div>';
@@ -593,8 +664,131 @@ async function submitAuth(){
 async function logOut(){
   if(sb) await sb.auth.signOut();
   currentUser = null;
+  currentProfile = null;
   renderAuthBar();
   goHome();
+}
+
+function buildSemesterOptions(selectEl, selectedValue){
+  let html = '<option value="">Vælg semester</option><optgroup label="Bachelor">';
+  ['b1','b2','b3','b4','b5','b6'].forEach(id => {
+    html += '<option value="' + id + '"' + (id === selectedValue ? ' selected' : '') + '>' + SEMESTERS[id] + '</option>';
+  });
+  html += '</optgroup><optgroup label="Kandidat">';
+  ['k1','k2','k3','k4','k5','k6'].forEach(id => {
+    html += '<option value="' + id + '"' + (id === selectedValue ? ' selected' : '') + '>' + SEMESTERS[id] + '</option>';
+  });
+  html += '</optgroup>';
+  selectEl.innerHTML = html;
+}
+
+async function loadProfileForCurrentUser(){
+  currentProfile = null;
+  if(!currentUser || !isConfigured()) return;
+  try{
+    const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).maybeSingle();
+    currentProfile = data || null;
+  }catch(e){ currentProfile = null; }
+}
+
+function openOnboarding(){
+  document.getElementById('onboardName').value = '';
+  buildSemesterOptions(document.getElementById('onboardSemester'), '');
+  document.getElementById('onboardShowEmail').checked = false;
+  document.getElementById('onboardErrorBox').innerHTML = '';
+  showView('onboarding');
+}
+
+async function submitOnboarding(){
+  const errBox = document.getElementById('onboardErrorBox');
+  errBox.innerHTML = '';
+  const name = document.getElementById('onboardName').value.trim();
+  const semester = document.getElementById('onboardSemester').value;
+  const showEmail = document.getElementById('onboardShowEmail').checked;
+  if(!name){ errBox.innerHTML = '<div class="error">Indtast dit navn.</div>'; return; }
+
+  try{
+    const { error } = await sb.from('profiles').insert({
+      id: currentUser.id,
+      full_name: name,
+      semester: semester || null,
+      show_email: showEmail,
+      email: showEmail ? currentUser.email : null
+    });
+    if(error) throw error;
+    await loadProfileForCurrentUser();
+    renderAuthBar();
+    goHome();
+  }catch(e){
+    errBox.innerHTML = '<div class="error">Kunne ikke gemme: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+function openProfileView(){
+  if(!currentUser){ openAuthView(); return; }
+  document.getElementById('profileName').value = currentProfile ? (currentProfile.full_name || '') : '';
+  document.getElementById('profileEmailText').textContent = currentUser.email;
+  document.getElementById('profileShowEmail').checked = currentProfile ? !!currentProfile.show_email : false;
+  buildSemesterOptions(document.getElementById('profileSemester'), currentProfile ? currentProfile.semester : '');
+  document.getElementById('profileErrorBox').innerHTML = '';
+  document.getElementById('profileStatusBox').innerHTML = '';
+  loadMyDecks();
+  showView('profile');
+}
+
+async function saveProfile(){
+  const errBox = document.getElementById('profileErrorBox');
+  const statusBox = document.getElementById('profileStatusBox');
+  errBox.innerHTML = '';
+  statusBox.innerHTML = '';
+  const name = document.getElementById('profileName').value.trim();
+  const semester = document.getElementById('profileSemester').value;
+  const showEmail = document.getElementById('profileShowEmail').checked;
+  if(!name){ errBox.innerHTML = '<div class="error">Indtast dit navn.</div>'; return; }
+
+  try{
+    const { error } = await sb.from('profiles').upsert({
+      id: currentUser.id,
+      full_name: name,
+      semester: semester || null,
+      show_email: showEmail,
+      email: showEmail ? currentUser.email : null
+    });
+    if(error) throw error;
+    await loadProfileForCurrentUser();
+    statusBox.innerHTML = '<div class="status">Gemt.</div>';
+  }catch(e){
+    errBox.innerHTML = '<div class="error">Kunne ikke gemme: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+let myDecksCache = [];
+
+async function loadMyDecks(){
+  const listEl = document.getElementById('myDecksList');
+  listEl.innerHTML = '<div class="empty">Henter...</div>';
+  try{
+    const { data, error } = await sb.from('decks').select('*')
+      .eq('created_by', currentUser.id).eq('type', 'user').order('created_at', { ascending: false });
+    if(error) throw error;
+    myDecksCache = data || [];
+    if(myDecksCache.length === 0){
+      listEl.innerHTML = '<div class="empty">Du har ikke oprettet nogen sæt endnu.</div>';
+      return;
+    }
+    listEl.innerHTML = myDecksCache.map((d, i) =>
+      '<div class="program-card" onclick="openMyDeck(' + i + ')">' +
+      '<div class="name">' + escapeHtml(d.name) + '</div>' +
+      '<div class="place">' + escapeHtml(SEMESTERS[d.semester] || d.semester) + ' &middot; Delekode: ' + escapeHtml(d.share_code) + '</div></div>'
+    ).join('');
+  }catch(e){
+    listEl.innerHTML = '<div class="error">Kunne ikke hente dine sæt: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+function openMyDeck(i){
+  const d = myDecksCache[i];
+  if(d) openDeck(d);
 }
 
 function getKnownSet(deckId){
@@ -864,8 +1058,10 @@ async function initAuth(){
     const { data } = await sb.auth.getSession();
     currentUser = data.session ? data.session.user : null;
   }catch(e){ currentUser = null; }
-  sb.auth.onAuthStateChange((event, session) => {
+  if(currentUser) await loadProfileForCurrentUser();
+  sb.auth.onAuthStateChange(async (event, session) => {
     currentUser = session ? session.user : null;
+    if(currentUser){ await loadProfileForCurrentUser(); } else { currentProfile = null; }
     renderAuthBar();
   });
   renderAuthBar();
@@ -890,4 +1086,3 @@ init();
 </script>
 </body>
 </html>
-
