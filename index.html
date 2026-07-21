@@ -533,6 +533,7 @@ async function generate(){
       body: JSON.stringify({
         model: 'claude-sonnet-5',
         max_tokens: 4000,
+        thinking: { type: 'disabled' },
         messages: [{
           role: 'user',
           content: 'Du hjaelper en medicinstuderende paa ' + SEMESTERS[currentSemester] + ' med at lave eksamens-flashcards ud fra deres noter. Sattet, kortene tilhoerer, hedder "' + currentDeck.name + '".\n\n' +
