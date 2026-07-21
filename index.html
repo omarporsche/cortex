@@ -545,13 +545,24 @@ async function generate(){
     });
 
     const data = await response.json();
-    if(data.error){ throw new Error(data.error.message || 'API-fejl'); }
+    if(!response.ok){
+      const msg = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + response.status);
+      throw new Error(msg);
+    }
+    if(!data || !data.content || !data.content[0] || !data.content[0].text){
+      throw new Error('Uventet svar fra AI-tjenesten: ' + JSON.stringify(data).slice(0, 300));
+    }
 
     let raw = data.content[0].text.trim();
     if(raw.indexOf('```') === 0){
       raw = raw.replace(/^```json?/,'').replace(/```$/,'').trim();
     }
-    const parsed = JSON.parse(raw);
+    let parsed;
+    try{
+      parsed = JSON.parse(raw);
+    }catch(parseErr){
+      throw new Error('Kunne ikke laese AI-svaret som JSON. Svar startede med: ' + raw.slice(0, 150));
+    }
     const insertRows = parsed.map(c => ({ deck_id: currentDeck.id, question: c.question, answer: c.answer }));
 
     const { data: inserted, error: insertError } = await sb.from('cards').insert(insertRows).select();
