@@ -96,6 +96,7 @@
 
   <!-- VIEW: HOME -->
   <div id="view-home">
+    <div id="authBar" style="display:flex;justify-content:flex-end;font-size:13px;margin-bottom:8px;"></div>
     <h1>Cortex</h1>
     <p class="sub">Vælg dit studie</p>
     <input type="text" id="programSearch" placeholder="Søg efter studie eller universitet..."
@@ -103,6 +104,28 @@
       padding:10px 14px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:16px;"
       oninput="renderPrograms()">
     <div class="program-grid" id="programGrid"></div>
+  </div>
+
+  <!-- VIEW: AUTH -->
+  <div id="view-auth" style="display:none;">
+    <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
+    <h1 id="authTitle">Log ind</h1>
+    <p class="sub" id="authSub">Log ind for at oprette og dele dine egne flashcards.</p>
+    <div class="panel">
+      <input type="email" id="authEmail" placeholder="Email"
+        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;">
+      <input type="password" id="authPassword" placeholder="Adgangskode (mindst 6 tegn)"
+        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;">
+      <div class="row">
+        <a href="#" id="authToggleBtn" onclick="toggleAuthMode();return false;"
+          style="font-size:13px;color:var(--accent);">Har du ikke en konto? Opret en</a>
+        <button id="authSubmitBtn" onclick="submitAuth()">Log ind</button>
+      </div>
+      <div id="authStatusBox"></div>
+      <div id="authErrorBox"></div>
+    </div>
   </div>
 
   <!-- VIEW: SEMESTER PICKER -->
@@ -325,6 +348,8 @@ const SEMESTERS = {
 };
 
 let cards = [];
+let currentUser = null;
+let authMode = 'login';
 let apiKey = localStorage.getItem('medikort_api_key') || '';
 let currentSemester = null;
 let currentDeck = null;
@@ -338,7 +363,7 @@ function buildSemesterGrids(){
     '<button class="sem-btn" onclick="selectSemester(\'' + id + '\')">' + SEMESTERS[id] + '</button>').join('');
 }
 
-const ALL_VIEWS = ['home','semester','decks','app','about','contact','privacy'];
+const ALL_VIEWS = ['home','auth','semester','decks','app','about','contact','privacy'];
 
 function showView(name){
   ALL_VIEWS.forEach(v => {
@@ -389,6 +414,12 @@ async function openOfficialDeck(level){
       .eq('semester', currentSemester).eq('type','official').eq('level', level).maybeSingle();
     if(error) throw error;
     if(!data){
+      if(!currentUser){
+        errBox.innerHTML = '<div class="error">Dette sæt findes ikke endnu. Du skal ' +
+          '<a href="#" onclick="openAuthView();return false;" style="color:inherit;text-decoration:underline;">logge ind eller oprette en konto</a> ' +
+          'for at være den første til at oprette det.</div>';
+        return;
+      }
       const name = SEMESTERS[currentSemester] + ' – ' + capitalize(level);
       const insertRes = await sb.from('decks').insert({
         semester: currentSemester, type: 'official', level: level, name: name
@@ -426,6 +457,7 @@ async function createUserDeck(){
   const errBox = document.getElementById('decksErrorBox');
   errBox.innerHTML = '';
   if(!isConfigured()){ errBox.innerHTML = configWarning(); return; }
+  if(!currentUser){ errBox.innerHTML = requireLoginMessage(); return; }
   const name = document.getElementById('newDeckName').value.trim();
   if(!name){ errBox.innerHTML = '<div class="error">Giv dit sæt et navn.</div>'; return; }
 
@@ -475,6 +507,96 @@ function saveApiKey(){
   showStatus('API-nøgle gemt i denne browser.');
 }
 
+function renderAuthBar(){
+  const bar = document.getElementById('authBar');
+  if(!bar) return;
+  if(currentUser){
+    bar.innerHTML = 'Logget ind som ' + escapeHtml(currentUser.email) +
+      ' &middot; <a href="#" onclick="logOut();return false;" style="color:var(--accent);">Log ud</a>';
+  }else{
+    bar.innerHTML = '<a href="#" onclick="openAuthView();return false;" style="color:var(--accent);">Log ind / opret konto</a>';
+  }
+}
+
+function toggleAuthMode(){
+  authMode = (authMode === 'login') ? 'signup' : 'login';
+  updateAuthLabels();
+}
+
+function openAuthView(){
+  authMode = 'login';
+  document.getElementById('authEmail').value = '';
+  document.getElementById('authPassword').value = '';
+  updateAuthLabels();
+  showView('auth');
+}
+
+function updateAuthLabels(){
+  document.getElementById('authErrorBox').innerHTML = '';
+  document.getElementById('authStatusBox').innerHTML = '';
+  if(authMode === 'login'){
+    document.getElementById('authTitle').textContent = 'Log ind';
+    document.getElementById('authSubmitBtn').textContent = 'Log ind';
+    document.getElementById('authToggleBtn').textContent = 'Har du ikke en konto? Opret en';
+  }else{
+    document.getElementById('authTitle').textContent = 'Opret konto';
+    document.getElementById('authSubmitBtn').textContent = 'Opret konto';
+    document.getElementById('authToggleBtn').textContent = 'Har du allerede en konto? Log ind';
+  }
+}
+
+function requireLoginMessage(){
+  return '<div class="error">Du skal <a href="#" onclick="openAuthView();return false;" style="color:inherit;text-decoration:underline;">logge ind eller oprette en konto</a> for at gøre det her.</div>';
+}
+
+async function submitAuth(){
+  const errBox = document.getElementById('authErrorBox');
+  const statusBox = document.getElementById('authStatusBox');
+  errBox.innerHTML = '';
+  statusBox.innerHTML = '';
+  if(!isConfigured()){ errBox.innerHTML = configWarning(); return; }
+
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  if(!email || !password){ errBox.innerHTML = '<div class="error">Udfyld både email og adgangskode.</div>'; return; }
+
+  const btn = document.getElementById('authSubmitBtn');
+  btn.disabled = true;
+
+  try{
+    if(authMode === 'signup'){
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if(error) throw error;
+      if(data.session){
+        currentUser = data.session.user;
+        renderAuthBar();
+        statusBox.innerHTML = '<div class="status">Konto oprettet — du er logget ind.</div>';
+        setTimeout(goHome, 800);
+      }else{
+        statusBox.innerHTML = '<div class="status">Konto oprettet. Tjek din email for at bekræfte den, log derefter ind.</div>';
+      }
+    }else{
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if(error) throw error;
+      currentUser = data.user;
+      renderAuthBar();
+      statusBox.innerHTML = '<div class="status">Logget ind.</div>';
+      setTimeout(goHome, 500);
+    }
+  }catch(e){
+    errBox.innerHTML = '<div class="error">' + (e.message || 'Noget gik galt') + '</div>';
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+async function logOut(){
+  if(sb) await sb.auth.signOut();
+  currentUser = null;
+  renderAuthBar();
+  goHome();
+}
+
 function getKnownSet(deckId){
   try{ return new Set(JSON.parse(localStorage.getItem('cortex_known_' + deckId) || '[]')); }
   catch(e){ return new Set(); }
@@ -512,6 +634,7 @@ async function generate(){
   const notes = notesEl.value.trim();
   document.getElementById('errorBox').innerHTML = '';
   if(!isConfigured()){ showError(configWarning()); return; }
+  if(!currentUser){ showError(requireLoginMessage()); return; }
   if(!apiKey){ showError('Indsæt din API-nøgle øverst på siden først.'); return; }
   if(!notes){ showError('Indsæt lidt noter først.'); return; }
 
@@ -611,6 +734,7 @@ async function handleFile(ev){
   document.getElementById('errorBox').innerHTML = '';
   document.getElementById('statusBox').innerHTML = '';
   if(!isConfigured()){ showError(configWarning()); ev.target.value=''; return; }
+  if(!currentUser){ showError(requireLoginMessage()); ev.target.value=''; return; }
 
   try{
     let rows = null;
@@ -734,8 +858,22 @@ function escapeHtml(s){
 }
 
 // Init
+async function initAuth(){
+  if(!isConfigured()) return;
+  try{
+    const { data } = await sb.auth.getSession();
+    currentUser = data.session ? data.session.user : null;
+  }catch(e){ currentUser = null; }
+  sb.auth.onAuthStateChange((event, session) => {
+    currentUser = session ? session.user : null;
+    renderAuthBar();
+  });
+  renderAuthBar();
+}
+
 async function init(){
   buildSemesterGrids();
+  await initAuth();
   const savedRaw = localStorage.getItem('cortex_current_deck');
   if(savedRaw && isConfigured()){
     try{
@@ -752,3 +890,4 @@ init();
 </script>
 </body>
 </html>
+
