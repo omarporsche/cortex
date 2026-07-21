@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cortex</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+<style>
+  :root{
+    --paper:#F5F1E8; --paper-dark:#1B1B18;
+    --ink:#2B2A25; --ink-dark:#EDEAE0;
+    --card:#FFFDF7; --card-dark:#26261F;
+    --line:#D8D2C0; --line-dark:#3A3930;
+    --accent:#0F6E56; --accent-light:#E1F5EE;
+    --accent-dark:#5DCAA5; --accent-light-dark:#123A2E;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --paper:var(--paper-dark); --ink:var(--ink-dark); --card:var(--card-dark);
+      --line:var(--line-dark); --accent-light:var(--accent-light-dark); --accent:var(--accent-dark); }
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,Segoe UI,sans-serif;}
+  .wrap{max-width:640px;margin:0 auto;padding:32px 20px 60px;}
+  h1{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:28px;
+    margin:0 0 4px;letter-spacing:-0.01em;}
+  .sub{color:var(--ink);opacity:0.6;font-size:14px;margin:0 0 24px;}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:18px;margin-bottom:20px;}
+  textarea{width:100%;min-height:120px;background:transparent;color:var(--ink);
+    border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:14px;
+    font-family:inherit;resize:vertical;}
+  textarea:focus{outline:none;border-color:var(--accent);}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap;}
+  .count{font-size:13px;color:var(--ink);opacity:0.6;}
+  button{font-family:inherit;font-size:14px;cursor:pointer;border-radius:6px;
+    border:1px solid var(--accent);background:var(--accent);color:#fff;padding:9px 16px;}
+  button:disabled{opacity:0.5;cursor:default;}
+  button.ghost{background:transparent;color:var(--accent);}
+  button.small{padding:5px 10px;font-size:12px;}
+  .stats{display:flex;gap:20px;margin-bottom:18px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:12px 16px;flex:1;text-align:center;}
+  .stat .n{font-size:22px;font-family:Georgia,serif;}
+  .stat .l{font-size:12px;opacity:0.6;margin-top:2px;}
+  .deck{display:grid;grid-template-columns:1fr;gap:14px;}
+  .card{perspective:1000px;height:150px;cursor:pointer;}
+  .card-inner{position:relative;width:100%;height:100%;transition:transform 0.5s;
+    transform-style:preserve-3d;}
+  .card.flipped .card-inner{transform:rotateY(180deg);}
+  .face{position:absolute;inset:0;backface-visibility:hidden;border-radius:10px;
+    border:1px solid var(--line);background:var(--card);padding:16px;
+    display:flex;flex-direction:column;}
+  .face .tag{font-size:11px;text-transform:uppercase;letter-spacing:0.06em;
+    color:var(--accent);margin-bottom:8px;}
+  .face .txt{font-size:15px;line-height:1.5;overflow-y:auto;flex:1;}
+  .back{transform:rotateY(180deg);background:var(--accent-light);}
+  .card-top{display:flex;justify-content:flex-end;gap:6px;position:relative;z-index:2;}
+  .icon-btn{background:transparent;border:none;color:var(--ink);opacity:0.4;padding:2px 4px;
+    font-size:16px;line-height:1;}
+  .icon-btn:hover{opacity:0.9;}
+  .empty{text-align:center;padding:40px 20px;opacity:0.6;font-size:14px;}
+  .error{background:#F5C4B3;color:#4A1B0C;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:10px;}
+  .status{background:var(--accent-light);color:var(--accent);border-radius:8px;padding:10px 14px;font-size:13px;margin-top:10px;}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid #fff;
+    border-top-color:transparent;border-radius:50%;animation:sp 0.7s linear infinite;
+    vertical-align:-2px;margin-right:6px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .settings{display:flex;gap:8px;align-items:center;margin-bottom:20px;}
+  .settings input{flex:1;background:var(--card);border:1px solid var(--line);
+    border-radius:6px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:inherit;}
+
+  .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--ink);
+    font-size:14px;text-decoration:none;cursor:pointer;margin-bottom:16px;
+    background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;}
+  .back-link:hover{border-color:var(--accent);color:var(--accent);}
+
+  .program-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:20px;}
+  .program-card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:20px;cursor:pointer;text-align:left;}
+  .program-card:hover{border-color:var(--accent);}
+  .program-card .name{font-size:16px;font-weight:500;margin-bottom:2px;}
+  .program-card .place{font-size:13px;opacity:0.6;}
+  .program-card.disabled{opacity:0.4;cursor:default;}
+  .program-card.disabled:hover{border-color:var(--line);}
+
+  .sem-group{margin-bottom:24px;}
+  .sem-group h3{font-size:14px;font-weight:500;opacity:0.6;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.04em;}
+  .sem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .sem-btn{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:16px 8px;text-align:center;cursor:pointer;font-size:14px;color:var(--ink);}
+  .sem-btn:hover{border-color:var(--accent);color:var(--accent);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- VIEW: HOME -->
+  <div id="view-home">
+    <h1>Cortex</h1>
+    <p class="sub">Vælg dit studie</p>
+    <input type="text" id="programSearch" placeholder="Søg efter studie eller universitet..."
+      style="width:100%;background:var(--card);border:1px solid var(--line);border-radius:8px;
+      padding:10px 14px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:16px;"
+      oninput="renderPrograms()">
+    <div class="program-grid" id="programGrid"></div>
+  </div>
+
+  <!-- VIEW: SEMESTER PICKER -->
+  <div id="view-semester" style="display:none;">
+    <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
+    <h1>Vælg semester</h1>
+    <p class="sub">Vælg semester for at se sæt af flashcards</p>
+
+    <div class="sem-group">
+      <h3>Bachelor</h3>
+      <div class="sem-grid" id="semGridBachelor"></div>
+    </div>
+    <div class="sem-group">
+      <h3>Kandidat</h3>
+      <div class="sem-grid" id="semGridKandidat"></div>
+    </div>
+  </div>
+
+  <!-- VIEW: DECK PICKER -->
+  <div id="view-decks" style="display:none;">
+    <button class="back-link" onclick="goToSemesters()"><i class="ti ti-arrow-left"></i>Tilbage til semestre</button>
+    <h1 id="decksTitle">Vælg sæt</h1>
+    <p class="sub" id="decksSub"></p>
+
+    <div class="sem-group">
+      <h3>Officielle sæt</h3>
+      <div class="program-grid">
+        <div class="program-card" onclick="openOfficialDeck('begynder')">
+          <div class="name">Begynder</div>
+          <div class="place">Grundlæggende overblik, godt at starte med</div>
+        </div>
+        <div class="program-card" onclick="openOfficialDeck('midt-sem')">
+          <div class="name">Midt-sem</div>
+          <div class="place">Uddybende, midt i pensum</div>
+        </div>
+        <div class="program-card" onclick="openOfficialDeck('eksamen')">
+          <div class="name">Eksamen</div>
+          <div class="place">Fuld dybde, eksamensklar</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sem-group">
+      <h3>Brugerdefinerede sæt</h3>
+      <div class="panel">
+        <p style="font-size:13px;opacity:0.7;margin:0 0 10px;">Har du fået en delekode af en ven?</p>
+        <div class="row" style="margin-top:0;">
+          <input type="text" id="codeInput" placeholder="Indtast delekode, fx 2182U"
+            style="flex:1;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+            padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;text-transform:uppercase;">
+          <button class="ghost small" onclick="findByCode()">Find sæt</button>
+        </div>
+      </div>
+      <div class="panel">
+        <p style="font-size:13px;opacity:0.7;margin:0 0 10px;">Opret dit eget sæt og få en delekode til dine venner.</p>
+        <div class="row" style="margin-top:0;">
+          <input type="text" id="newDeckName" placeholder="Navn på dit sæt, fx Farmakologi genopfriskning"
+            style="flex:1;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+            padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;">
+          <button class="ghost small" onclick="createUserDeck()">Opret</button>
+        </div>
+      </div>
+      <div id="decksErrorBox"></div>
+    </div>
+  </div>
+
+  <!-- VIEW: FLASHCARD APP -->
+  <div id="view-app" style="display:none;">
+    <button class="back-link" onclick="selectSemester(currentSemester)"><i class="ti ti-arrow-left"></i>Tilbage til sæt</button>
+    <h1 id="appTitle">Cortex</h1>
+    <p class="sub" id="appSub">Lav flashcards ud af dine noter</p>
+    <div id="shareCodeBox" class="status" style="display:none;"></div>
+
+    <div class="settings" id="settingsRow">
+      <input type="password" id="apiKeyInput" placeholder="Indsæt din Anthropic API-nøgle (sk-ant-...)">
+      <button class="ghost small" onclick="saveApiKey()">Gem</button>
+    </div>
+
+    <div class="panel">
+      <textarea id="notes" placeholder="Indsæt dine noter her, f.eks. fra en forelæsning eller pensum..."></textarea>
+      <div class="row">
+        <span class="count" id="charCount">0 tegn</span>
+        <div style="display:flex;gap:8px;">
+          <input type="file" id="fileInput" accept=".txt,.md,.csv,.apkg" style="display:none" onchange="handleFile(event)">
+          <button class="ghost" onclick="document.getElementById('fileInput').click()">
+            <i class="ti ti-upload" style="font-size:15px;vertical-align:-2px;margin-right:4px;"></i>Importér fil
+          </button>
+          <button id="genBtn" onclick="generate()">Generér flashcards</button>
+        </div>
+      </div>
+      <div id="statusBox"></div>
+      <div id="errorBox"></div>
+    </div>
+
+    <div class="stats" id="stats" style="display:none;">
+      <div class="stat"><div class="n" id="totalN">0</div><div class="l">kort i alt</div></div>
+      <div class="stat"><div class="n" id="knownN">0</div><div class="l">kan du</div></div>
+    </div>
+
+    <div class="deck" id="deck"></div>
+  </div>
+
+  <!-- VIEW: ABOUT -->
+  <div id="view-about" style="display:none;">
+    <button class="back-link" onclick="showView(returnView)"><i class="ti ti-arrow-left"></i>Tilbage</button>
+    <h1>Om Cortex</h1>
+    <p style="font-size:14px;line-height:1.7;">
+      Cortex er et gratis studieværktøj lavet af en medicinstuderende, til medicinstuderende.
+      Der ligger officielle flashcard-sæt klar for hvert semester i tre sværhedsgrader
+      (begynder, midt-sem, eksamen), og du kan selv uploade og dele sæt med andre via en delekode.
+    </p>
+    <p style="font-size:14px;line-height:1.7;">
+      Cortex er ikke en officiel del af KU eller Panum-instituttets undervisning, og indholdet i
+      flashcards er ikke kvalitetssikret af undervisere. Brug det som et supplement til din
+      læsning, ikke som eneste kilde — og dobbelttjek altid vigtige detaljer op imod pensum og
+      dine forelæsninger.
+    </p>
+    <p style="font-size:14px;line-height:1.7;">
+      Projektet er under udvikling, og flere studier og funktioner er på vej.
+    </p>
+  </div>
+
+  <!-- VIEW: CONTACT -->
+  <div id="view-contact" style="display:none;">
+    <button class="back-link" onclick="showView(returnView)"><i class="ti ti-arrow-left"></i>Tilbage</button>
+    <h1>Kontakt os</h1>
+    <p style="font-size:14px;line-height:1.7;">
+      Har du feedback, fundet en fejl, eller vil du gerne have dit studie tilføjet til listen?
+      Skriv endelig.
+    </p>
+    <p style="font-size:14px;line-height:1.7;">
+      <a href="mailto:din@email.dk" style="color:var(--accent);">din@email.dk</a>
+    </p>
+    <p style="font-size:13px;opacity:0.6;line-height:1.6;">
+      (Husk at rette mailadressen ovenfor til din egen, i koden.)
+    </p>
+  </div>
+
+  <!-- VIEW: PRIVACY -->
+  <div id="view-privacy" style="display:none;">
+    <button class="back-link" onclick="showView(returnView)"><i class="ti ti-arrow-left"></i>Tilbage</button>
+    <h1>Privatliv og data</h1>
+    <p style="font-size:14px;line-height:1.7;">
+      Cortex har ingen brugerkonti eller login. Sådan håndteres data:
+    </p>
+    <ul style="font-size:14px;line-height:1.9;">
+      <li>Flashcards (spørgsmål og svar) i officielle sæt og brugersæt gemmes i en delt database, så de kan deles på tværs af studerende via delekoder.</li>
+      <li>Din egen "kender jeg / kender jeg ikke"-markering af kort er personlig og gemmes kun lokalt i din browser — den påvirker ikke andres visning af samme sæt.</li>
+      <li>Din API-nøgle gemmes kun lokalt i din browser og bruges udelukkende til at kalde Anthropics API direkte fra din browser, når du genererer nye kort.</li>
+      <li>Når du genererer flashcards, sendes teksten fra dine noter direkte til Anthropic for at generere kortene.</li>
+      <li>Der er ingen tracking, analytics eller cookies på siden.</li>
+    </ul>
+    <p style="font-size:14px;line-height:1.7;">
+      Fordi der endnu ikke er login, kan alle med adgang til siden i princippet tilføje kort til
+      ethvert sæt, inklusive officielle sæt. Det kan ændre sig, efterhånden som siden udvikles.
+    </p>
+  </div>
+
+  <div style="display:flex;gap:16px;justify-content:center;margin-top:36px;padding-top:20px;
+    border-top:1px solid var(--line);font-size:13px;">
+    <a href="#" onclick="showInfo('about');return false;" style="color:var(--ink);opacity:0.6;text-decoration:none;">Om os</a>
+    <a href="#" onclick="showInfo('contact');return false;" style="color:var(--ink);opacity:0.6;text-decoration:none;">Kontakt os</a>
+    <a href="#" onclick="showInfo('privacy');return false;" style="color:var(--ink);opacity:0.6;text-decoration:none;">Privatliv</a>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+// ---- SUPABASE CONFIG: replace these two lines with your own project's values ----
+const SUPABASE_URL = 'https://ygwydvssavgfsxpgxxdd.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3lkdnNzYXZnZnN4cGd4eGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NDkxMDYsImV4cCI6MjEwMDIyNTEwNn0.ptSE_nFUhzwvGyudbG08ROlbL4B4dHzpGpAR_pUvrOY';
+// -----------------------------------------------------------------------------
+const sb = (typeof supabase !== 'undefined') ? supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+function isConfigured(){
+  return sb && !SUPABASE_URL.includes('YOUR-PROJECT') && !SUPABASE_ANON_KEY.includes('YOUR-ANON-KEY');
+}
+function configWarning(){
+  return '<div class="error">Cortex er ikke forbundet til en database endnu. Indsæt din Supabase URL og anon-nøgle i koden (søg efter YOUR-PROJECT).</div>';
+}
+
+const PROGRAMS = [
+  { name:'Medicin, KU', place:'Københavns Universitet', enabled:true },
+  { name:'Medicin, SDU', place:'Syddansk Universitet', enabled:false },
+  { name:'Medicin, AU', place:'Aarhus Universitet', enabled:false },
+  { name:'Medicin, AAU', place:'Aalborg Universitet', enabled:false },
+  { name:'Medicin og teknologi, DTU/KU', place:'DTU og Københavns Universitet', enabled:false }
+];
+
+function renderPrograms(){
+  const query = document.getElementById('programSearch').value.trim().toLowerCase();
+  const grid = document.getElementById('programGrid');
+  const filtered = PROGRAMS.filter(p =>
+    !query || p.name.toLowerCase().includes(query) || p.place.toLowerCase().includes(query));
+
+  if(filtered.length === 0){
+    grid.innerHTML = '<div class="empty">Ingen studier matcher "' + escapeHtml(query) + '".</div>';
+    return;
+  }
+
+  grid.innerHTML = filtered.map(p => {
+    if(p.enabled){
+      return '<div class="program-card" onclick="goToSemesters()">' +
+        '<div class="name">' + escapeHtml(p.name) + '</div>' +
+        '<div class="place">' + escapeHtml(p.place) + '</div></div>';
+    }
+    return '<div class="program-card disabled">' +
+      '<div class="name">' + escapeHtml(p.name) + '</div>' +
+      '<div class="place">' + escapeHtml(p.place) + ' · kommer snart</div></div>';
+  }).join('');
+}
+
+const SEMESTERS = {
+  b1:'1. semester', b2:'2. semester', b3:'3. semester',
+  b4:'4. semester', b5:'5. semester', b6:'6. semester',
+  k1:'1. semester', k2:'2. semester', k3:'3. semester',
+  k4:'4. semester', k5:'5. semester', k6:'6. semester'
+};
+
+let cards = [];
+let apiKey = localStorage.getItem('medikort_api_key') || '';
+let currentSemester = null;
+let currentDeck = null;
+
+function buildSemesterGrids(){
+  const bGrid = document.getElementById('semGridBachelor');
+  const kGrid = document.getElementById('semGridKandidat');
+  bGrid.innerHTML = ['b1','b2','b3','b4','b5','b6'].map(id =>
+    '<button class="sem-btn" onclick="selectSemester(\'' + id + '\')">' + SEMESTERS[id] + '</button>').join('');
+  kGrid.innerHTML = ['k1','k2','k3','k4','k5','k6'].map(id =>
+    '<button class="sem-btn" onclick="selectSemester(\'' + id + '\')">' + SEMESTERS[id] + '</button>').join('');
+}
+
+const ALL_VIEWS = ['home','semester','decks','app','about','contact','privacy'];
+let returnView = 'home';
+
+function showView(name){
+  ALL_VIEWS.forEach(v => {
+    document.getElementById('view-' + v).style.display = (v === name) ? 'block' : 'none';
+  });
+}
+
+function showInfo(name){
+  returnView = ALL_VIEWS.find(v => document.getElementById('view-' + v).style.display === 'block') || 'home';
+  showView(name);
+}
+
+function goHome(){
+  localStorage.removeItem('cortex_current_deck');
+  currentSemester = null;
+  currentDeck = null;
+  const search = document.getElementById('programSearch');
+  if(search) search.value = '';
+  renderPrograms();
+  showView('home');
+}
+
+function goToSemesters(){
+  localStorage.removeItem('cortex_current_deck');
+  currentDeck = null;
+  showView('semester');
+}
+
+function selectSemester(id){
+  currentSemester = id;
+  currentDeck = null;
+  localStorage.removeItem('cortex_current_deck');
+  const group = id.startsWith('b') ? 'Bachelor' : 'Kandidat';
+  document.getElementById('decksSub').textContent = 'Medicin, KU · ' + group + ' · ' + SEMESTERS[id];
+  document.getElementById('decksErrorBox').innerHTML = '';
+  document.getElementById('codeInput').value = '';
+  document.getElementById('newDeckName').value = '';
+  showView('decks');
+}
+
+function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+async function openOfficialDeck(level){
+  const errBox = document.getElementById('decksErrorBox');
+  errBox.innerHTML = '';
+  if(!isConfigured()){ errBox.innerHTML = configWarning(); return; }
+  try{
+    let { data, error } = await sb.from('decks').select('*')
+      .eq('semester', currentSemester).eq('type','official').eq('level', level).maybeSingle();
+    if(error) throw error;
+    if(!data){
+      const name = SEMESTERS[currentSemester] + ' – ' + capitalize(level);
+      const insertRes = await sb.from('decks').insert({
+        semester: currentSemester, type: 'official', level: level, name: name
+      }).select().single();
+      if(insertRes.error) throw insertRes.error;
+      data = insertRes.data;
+    }
+    openDeck(data);
+  }catch(e){
+    errBox.innerHTML = '<div class="error">Kunne ikke åbne sættet: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+async function findByCode(){
+  const errBox = document.getElementById('decksErrorBox');
+  errBox.innerHTML = '';
+  if(!isConfigured()){ errBox.innerHTML = configWarning(); return; }
+  const code = document.getElementById('codeInput').value.trim().toUpperCase();
+  if(!code){ errBox.innerHTML = '<div class="error">Indtast en delekode.</div>'; return; }
+  try{
+    const { data, error } = await sb.from('decks').select('*').eq('share_code', code).maybeSingle();
+    if(error) throw error;
+    if(!data){ errBox.innerHTML = '<div class="error">Ingen sæt fundet med den kode.</div>'; return; }
+    openDeck(data);
+  }catch(e){
+    errBox.innerHTML = '<div class="error">Noget gik galt: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+function generateShareCode(){
+  return Math.random().toString(36).slice(2,8).toUpperCase();
+}
+
+async function createUserDeck(){
+  const errBox = document.getElementById('decksErrorBox');
+  errBox.innerHTML = '';
+  if(!isConfigured()){ errBox.innerHTML = configWarning(); return; }
+  const name = document.getElementById('newDeckName').value.trim();
+  if(!name){ errBox.innerHTML = '<div class="error">Giv dit sæt et navn.</div>'; return; }
+
+  for(let attempt = 0; attempt < 5; attempt++){
+    const code = generateShareCode();
+    const { data, error } = await sb.from('decks').insert({
+      semester: currentSemester, type: 'user', name: name, share_code: code
+    }).select().single();
+    if(!error){ openDeck(data); return; }
+    if(error.code !== '23505'){
+      errBox.innerHTML = '<div class="error">Kunne ikke oprette sæt: ' + error.message + '</div>';
+      return;
+    }
+  }
+  errBox.innerHTML = '<div class="error">Kunne ikke generere en unik delekode. Prøv igen.</div>';
+}
+
+function openDeck(deck){
+  currentDeck = deck;
+  currentSemester = deck.semester;
+  localStorage.setItem('cortex_current_deck', JSON.stringify(deck));
+
+  const group = deck.semester.startsWith('b') ? 'Bachelor' : 'Kandidat';
+  document.getElementById('appTitle').textContent = deck.type === 'official' ? capitalize(deck.level) : deck.name;
+  document.getElementById('appSub').textContent = 'Medicin, KU · ' + group + ' · ' + SEMESTERS[deck.semester];
+
+  const shareBox = document.getElementById('shareCodeBox');
+  if(deck.type === 'user'){
+    shareBox.style.display = 'block';
+    shareBox.innerHTML = 'Delekode til dette sæt: <strong>' + escapeHtml(deck.share_code) + '</strong> — del den med dine venner.';
+  }else{
+    shareBox.style.display = 'none';
+  }
+
+  initSettings();
+  loadCards();
+  showView('app');
+}
+
+function initSettings(){
+  document.getElementById('apiKeyInput').value = apiKey;
+}
+
+function saveApiKey(){
+  apiKey = document.getElementById('apiKeyInput').value.trim();
+  localStorage.setItem('medikort_api_key', apiKey);
+  showStatus('API-nøgle gemt i denne browser.');
+}
+
+function getKnownSet(deckId){
+  try{ return new Set(JSON.parse(localStorage.getItem('cortex_known_' + deckId) || '[]')); }
+  catch(e){ return new Set(); }
+}
+function saveKnownSet(deckId, set){
+  localStorage.setItem('cortex_known_' + deckId, JSON.stringify([...set]));
+}
+
+async function loadCards(){
+  if(!isConfigured()){
+    cards = [];
+    showError(configWarning());
+    render();
+    return;
+  }
+  try{
+    const { data, error } = await sb.from('cards').select('*')
+      .eq('deck_id', currentDeck.id).order('created_at', { ascending: true });
+    if(error) throw error;
+    const known = getKnownSet(currentDeck.id);
+    cards = (data || []).map(c => ({ id: c.id, question: c.question, answer: c.answer, known: known.has(c.id) }));
+  }catch(e){
+    cards = [];
+    showError('Kunne ikke hente kort: ' + (e.message || 'ukendt fejl'));
+  }
+  render();
+}
+
+document.getElementById('notes').addEventListener('input', (e)=>{
+  document.getElementById('charCount').textContent = e.target.value.length + ' tegn';
+});
+
+async function generate(){
+  const notesEl = document.getElementById('notes');
+  const notes = notesEl.value.trim();
+  document.getElementById('errorBox').innerHTML = '';
+  if(!isConfigured()){ showError(configWarning()); return; }
+  if(!apiKey){ showError('Indsæt din API-nøgle øverst på siden først.'); return; }
+  if(!notes){ showError('Indsæt lidt noter først.'); return; }
+
+  const btn = document.getElementById('genBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Genererer...';
+
+  try{
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 2000,
+        messages: [{
+          role: 'user',
+          content: 'Du hjaelper en medicinstuderende paa ' + SEMESTERS[currentSemester] + ' med at lave eksamens-flashcards ud fra deres noter. Sattet, kortene tilhoerer, hedder "' + currentDeck.name + '".\n\n' +
+            'Laes noterne nedenfor og lav praecis 8 flashcards, der tester de vigtigste, eksamensrelevante fakta og koncepter. Foretraek spoergsmaal der tester forstaaelse (mekanismer, differentialdiagnoser, "hvorfor") frem for ren udenadslaere, hvor det giver mening.\n\n' +
+            'Svar KUN med et JSON array, ingen anden tekst, ingen markdown-fences.\n' +
+            'Hvert element skal se saadan ud: {"question": "...", "answer": "..."}\n\n' +
+            'NOTER:\n' + notes
+        }]
+      })
+    });
+
+    const data = await response.json();
+    if(data.error){ throw new Error(data.error.message || 'API-fejl'); }
+
+    let raw = data.content[0].text.trim();
+    if(raw.indexOf('```') === 0){
+      raw = raw.replace(/^```json?/,'').replace(/```$/,'').trim();
+    }
+    const parsed = JSON.parse(raw);
+    const insertRows = parsed.map(c => ({ deck_id: currentDeck.id, question: c.question, answer: c.answer }));
+
+    const { data: inserted, error: insertError } = await sb.from('cards').insert(insertRows).select();
+    if(insertError) throw insertError;
+
+    const newCards = inserted.map(c => ({ id: c.id, question: c.question, answer: c.answer, known: false }));
+    cards = [...newCards, ...cards];
+    notesEl.value = '';
+    document.getElementById('charCount').textContent = '0 tegn';
+    render();
+    showStatus('Tilføjede ' + newCards.length + ' nye kort til sættet.');
+  }catch(e){
+    showError('Noget gik galt: ' + (e.message || 'ukendt fejl'));
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Generér flashcards';
+  }
+}
+
+function showStatus(msg){
+  document.getElementById('statusBox').innerHTML = '<div class="status">' + msg + '</div>';
+  document.getElementById('errorBox').innerHTML = '';
+}
+function showError(msg){
+  document.getElementById('errorBox').innerHTML = msg.indexOf('<div') === 0 ? msg : '<div class="error">' + msg + '</div>';
+  document.getElementById('statusBox').innerHTML = '';
+}
+
+function stripHtml(html){
+  if(!html) return '';
+  let s = html.replace(/\[sound:[^\]]+\]/g, '')
+              .replace(/<br\s*\/?>/gi, '\n')
+              .replace(/<\/(p|div|li)>/gi, '\n');
+  const d = document.createElement('div');
+  d.innerHTML = s;
+  return d.textContent.replace(/\n{2,}/g, '\n').trim();
+}
+
+async function handleFile(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const name = file.name.toLowerCase();
+  document.getElementById('errorBox').innerHTML = '';
+  document.getElementById('statusBox').innerHTML = '';
+  if(!isConfigured()){ showError(configWarning()); ev.target.value=''; return; }
+
+  try{
+    let rows = null;
+    if(name.endsWith('.apkg')){
+      rows = await parseApkg(file);
+    }else{
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(l => l.trim() && !l.startsWith('#'));
+      const tabLines = lines.filter(l => l.includes('\t'));
+
+      if(lines.length > 0 && tabLines.length / lines.length > 0.6){
+        rows = lines.map(l => {
+          const parts = l.split('\t');
+          return { question: stripHtml(parts[0]), answer: stripHtml(parts[1] || '') };
+        }).filter(c => c.question);
+      }else{
+        const notesEl = document.getElementById('notes');
+        notesEl.value = text;
+        document.getElementById('charCount').textContent = text.length + ' tegn';
+        showStatus('Filens indhold er sat ind i tekstfeltet. Klik "Generér flashcards" for at lave kort ud fra det.');
+        ev.target.value = '';
+        return;
+      }
+    }
+
+    if(!rows || rows.length === 0){ showError('Kunne ikke finde nogen kort i filen.'); ev.target.value=''; return; }
+
+    const insertRows = rows.map(r => ({ deck_id: currentDeck.id, question: r.question, answer: r.answer }));
+    const { data: inserted, error } = await sb.from('cards').insert(insertRows).select();
+    if(error) throw error;
+
+    const newCards = inserted.map(c => ({ id: c.id, question: c.question, answer: c.answer, known: false }));
+    cards = [...newCards, ...cards];
+    render();
+    showStatus('Importerede ' + newCards.length + ' kort.');
+  }catch(e){
+    showError('Kunne ikke importere filen: ' + (e.message || 'ukendt fejl'));
+  }finally{
+    ev.target.value = '';
+  }
+}
+
+async function parseApkg(file){
+  if(typeof JSZip === 'undefined' || typeof initSqlJs === 'undefined'){
+    throw new Error('Anki-import kunne ikke indlæses. Prøv at genindlæse siden.');
+  }
+  const buf = await file.arrayBuffer();
+  const zip = await JSZip.loadAsync(buf);
+  const dbEntry = zip.file('collection.anki21') || zip.file('collection.anki2');
+  if(!dbEntry){
+    if(zip.file('collection.anki21b')){
+      throw new Error('Denne .apkg-fil bruger et nyere komprimeret format, som ikke understøttes her. Prøv i Anki: Export > "Anki 2.1 (older, non-scheduling)", eller eksportér som "Notes in Plain Text" (.txt) i stedet.');
+    }
+    throw new Error('Kunne ikke finde en Anki-database i filen.');
+  }
+  const dbBuf = await dbEntry.async('uint8array');
+  const SQL = await initSqlJs({ locateFile: f => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/' + f });
+  const db = new SQL.Database(dbBuf);
+  let result;
+  try{ result = db.exec('SELECT flds FROM notes'); }
+  catch(e){ throw new Error('Kunne ikke læse kortene i Anki-filen.'); }
+  db.close();
+  if(!result.length || !result[0].values.length){ throw new Error('Ingen kort fundet i Anki-filen.'); }
+  return result[0].values.map(row => {
+    const flds = row[0].split('\x1f');
+    return { question: stripHtml(flds[0] || ''), answer: stripHtml(flds[1] || '') };
+  }).filter(c => c.question);
+}
+
+function toggleFlip(id){
+  document.getElementById('card-' + id).classList.toggle('flipped');
+}
+
+function toggleKnown(id, ev){
+  ev.stopPropagation();
+  const known = getKnownSet(currentDeck.id);
+  if(known.has(id)) known.delete(id); else known.add(id);
+  saveKnownSet(currentDeck.id, known);
+  const c = cards.find(c => c.id === id);
+  if(c) c.known = known.has(id);
+  render();
+}
+
+function render(){
+  const deckEl = document.getElementById('deck');
+  const stats = document.getElementById('stats');
+  if(cards.length === 0){
+    stats.style.display = 'none';
+    deckEl.innerHTML = '<div class="empty">Ingen flashcards endnu i dette sæt. Indsæt noter ovenfor for at komme i gang.</div>';
+    return;
+  }
+  stats.style.display = 'flex';
+  document.getElementById('totalN').textContent = cards.length;
+  document.getElementById('knownN').textContent = cards.filter(c=>c.known).length;
+
+  deckEl.innerHTML = cards.map(c => `
+    <div class="card" id="card-${c.id}" onclick="toggleFlip('${c.id}')">
+      <div class="card-inner">
+        <div class="face front">
+          <div class="card-top">
+            <button class="icon-btn" onclick="toggleKnown('${c.id}', event)" title="Marker som kendt">
+              <i class="ti ti-${c.known ? 'check' : 'circle'}"></i>
+            </button>
+          </div>
+          <div class="tag">Spørgsmål</div>
+          <div class="txt">${escapeHtml(c.question)}</div>
+        </div>
+        <div class="face back">
+          <div class="tag">Svar</div>
+          <div class="txt">${escapeHtml(c.answer)}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// Init
+async function init(){
+  buildSemesterGrids();
+  const savedRaw = localStorage.getItem('cortex_current_deck');
+  if(savedRaw && isConfigured()){
+    try{
+      const saved = JSON.parse(savedRaw);
+      const { data } = await sb.from('decks').select('*').eq('id', saved.id).maybeSingle();
+      if(data){ openDeck(data); return; }
+    }catch(e){}
+    localStorage.removeItem('cortex_current_deck');
+  }
+  renderPrograms();
+  showView('home');
+}
+init();
+</script>
+</body>
+</html>
