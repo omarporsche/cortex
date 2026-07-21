@@ -207,7 +207,7 @@
 
   <!-- VIEW: ABOUT -->
   <div id="view-about" style="display:none;">
-    <button class="back-link" onclick="showView(returnView)"><i class="ti ti-arrow-left"></i>Tilbage</button>
+    <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
     <h1>Om Cortex</h1>
     <p style="font-size:14px;line-height:1.7;">
       Cortex er et gratis studieværktøj lavet af en medicinstuderende, til medicinstuderende.
@@ -227,7 +227,7 @@
 
   <!-- VIEW: CONTACT -->
   <div id="view-contact" style="display:none;">
-    <button class="back-link" onclick="showView(returnView)"><i class="ti ti-arrow-left"></i>Tilbage</button>
+    <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
     <h1>Kontakt os</h1>
     <p style="font-size:14px;line-height:1.7;">
       Har du feedback, fundet en fejl, eller vil du gerne have dit studie tilføjet til listen?
@@ -243,7 +243,7 @@
 
   <!-- VIEW: PRIVACY -->
   <div id="view-privacy" style="display:none;">
-    <button class="back-link" onclick="showView(returnView)"><i class="ti ti-arrow-left"></i>Tilbage</button>
+    <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
     <h1>Privatliv og data</h1>
     <p style="font-size:14px;line-height:1.7;">
       Cortex har ingen brugerkonti eller login. Sådan håndteres data:
@@ -339,7 +339,6 @@ function buildSemesterGrids(){
 }
 
 const ALL_VIEWS = ['home','semester','decks','app','about','contact','privacy'];
-let returnView = 'home';
 
 function showView(name){
   ALL_VIEWS.forEach(v => {
@@ -348,7 +347,6 @@ function showView(name){
 }
 
 function showInfo(name){
-  returnView = ALL_VIEWS.find(v => document.getElementById('view-' + v).style.display === 'block') || 'home';
   showView(name);
 }
 
