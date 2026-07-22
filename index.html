@@ -519,12 +519,16 @@ async function openOfficialDeck(level){
       if(!currentUser){
         errBox.innerHTML = '<div class="error">Dette sæt findes ikke endnu. Du skal ' +
           '<a href="#" onclick="openAuthView();return false;" style="color:inherit;text-decoration:underline;">logge ind eller oprette en konto</a> ' +
-          'for at være den første til at oprette det.</div>';
+          'for at få adgang.</div>';
+        return;
+      }
+      if(!currentProfile || !currentProfile.is_admin){
+        errBox.innerHTML = '<div class="error">Dette sæt findes ikke endnu. Kun godkendte administratorer kan oprette officielle sæt.</div>';
         return;
       }
       const name = SEMESTERS[currentSemester] + ' – ' + capitalize(level);
       const insertRes = await sb.from('decks').insert({
-        semester: currentSemester, type: 'official', level: level, name: name
+        semester: currentSemester, type: 'official', level: level, name: name, created_by: currentUser.id
       }).select().single();
       if(insertRes.error) throw insertRes.error;
       data = insertRes.data;
@@ -650,6 +654,14 @@ function updateAuthLabels(){
 
 function requireLoginMessage(){
   return '<div class="error">Du skal <a href="#" onclick="openAuthView();return false;" style="color:inherit;text-decoration:underline;">logge ind eller oprette en konto</a> for at gøre det her.</div>';
+}
+
+function friendlyError(e){
+  const msg = (e && e.message) ? e.message : 'ukendt fejl';
+  if(msg.toLowerCase().indexOf('row-level security') !== -1){
+    return 'Du har ikke tilladelse til at tilføje kort til dette sæt. Officielle sæt (Begynder/Midt-sem/Eksamen) kan kun redigeres af godkendte administratorer.';
+  }
+  return msg;
 }
 
 async function submitAuth(){
@@ -991,7 +1003,7 @@ async function generate(){
     render();
     showStatus('Tilføjede ' + newCards.length + ' nye kort til sættet.');
   }catch(e){
-    showError('Noget gik galt: ' + (e.message || 'ukendt fejl'));
+    showError('Noget gik galt: ' + friendlyError(e));
   }finally{
     btn.disabled = false;
     btn.textContent = 'Generér flashcards';
@@ -1061,7 +1073,7 @@ async function handleFile(ev){
     render();
     showStatus('Importerede ' + newCards.length + ' kort.');
   }catch(e){
-    showError('Kunne ikke importere filen: ' + (e.message || 'ukendt fejl'));
+    showError('Kunne ikke importere filen: ' + friendlyError(e));
   }finally{
     ev.target.value = '';
   }
