@@ -70,9 +70,31 @@
     border-radius:6px;padding:8px 10px;font-size:13px;color:var(--ink);font-family:inherit;}
 
   .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--ink);
-    font-size:14px;text-decoration:none;cursor:pointer;margin-bottom:16px;
-    background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;}
-  .back-link:hover{border-color:var(--accent);color:var(--accent);}
+    font-size:13px;font-weight:500;text-decoration:none;cursor:pointer;margin-bottom:18px;
+    background:var(--card);border:1px solid var(--line);border-radius:999px;padding:7px 16px 7px 12px;
+    transition:border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;}
+  .back-link i{font-size:14px;}
+  .back-link:hover{border-color:var(--accent);color:var(--accent);box-shadow:0 2px 6px rgba(15,110,86,0.12);}
+  .back-link:active{transform:translateY(1px);}
+
+  .input, select.input{width:100%;background:var(--paper);border:1px solid var(--line);
+    border-radius:8px;padding:10px 12px;font-size:14px;color:var(--ink);font-family:inherit;
+    transition:border-color 0.15s ease, box-shadow 0.15s ease;}
+  .input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-light);}
+  .field-group{margin-bottom:14px;}
+  .field-label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;
+    letter-spacing:0.05em;opacity:0.5;margin:0 0 6px;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:18px;color:var(--ink);}
+  .checkbox-row input{width:16px;height:16px;accent-color:var(--accent);}
+
+  .auth-card{max-width:380px;margin:32px auto 0;}
+  .auth-card .panel{padding:28px 26px;}
+  .auth-icon{width:48px;height:48px;border-radius:50%;background:var(--accent-light);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:20px;color:var(--accent);}
+  .auth-submit{width:100%;padding:11px 16px;font-size:14px;font-weight:600;}
+  .auth-toggle{display:block;text-align:center;margin-top:16px;font-size:13px;
+    color:var(--accent);text-decoration:none;}
+  .auth-toggle:hover{text-decoration:underline;}
 
   .program-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:20px;}
   .program-card{background:var(--card);border:1px solid var(--line);border-radius:12px;
@@ -109,41 +131,48 @@
   <!-- VIEW: AUTH -->
   <div id="view-auth" style="display:none;">
     <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
-    <h1 id="authTitle">Log ind</h1>
-    <p class="sub" id="authSub">Log ind for at oprette og dele dine egne flashcards.</p>
-    <div class="panel">
-      <input type="email" id="authEmail" placeholder="Email"
-        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
-        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;">
-      <input type="password" id="authPassword" placeholder="Adgangskode (mindst 6 tegn)"
-        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
-        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;">
-      <div class="row">
-        <a href="#" id="authToggleBtn" onclick="toggleAuthMode();return false;"
-          style="font-size:13px;color:var(--accent);">Har du ikke en konto? Opret en</a>
-        <button id="authSubmitBtn" onclick="submitAuth()">Log ind</button>
+    <div class="auth-card">
+      <div class="auth-icon"><i class="ti ti-user"></i></div>
+      <h1 id="authTitle" style="text-align:center;">Log ind</h1>
+      <p class="sub" id="authSub" style="text-align:center;">Log ind for at oprette og dele dine egne flashcards.</p>
+      <div class="panel">
+        <div class="field-group">
+          <label class="field-label" for="authEmail">Email</label>
+          <input class="input" type="email" id="authEmail" placeholder="dig@eksempel.dk">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="authPassword">Adgangskode</label>
+          <input class="input" type="password" id="authPassword" placeholder="Mindst 6 tegn">
+        </div>
+        <button class="auth-submit" id="authSubmitBtn" onclick="submitAuth()">Log ind</button>
+        <a href="#" class="auth-toggle" id="authToggleBtn" onclick="toggleAuthMode();return false;">Har du ikke en konto? Opret en</a>
+        <div id="authStatusBox"></div>
+        <div id="authErrorBox"></div>
       </div>
-      <div id="authStatusBox"></div>
-      <div id="authErrorBox"></div>
     </div>
   </div>
 
   <!-- VIEW: ONBOARDING -->
   <div id="view-onboarding" style="display:none;">
-    <h1>Velkommen til Cortex</h1>
-    <p class="sub">Fortæl lidt om dig selv, før du kommer i gang</p>
-    <div class="panel">
-      <input type="text" id="onboardName" placeholder="Dit navn"
-        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
-        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;">
-      <select id="onboardSemester"
-        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
-        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;"></select>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:14px;">
-        <input type="checkbox" id="onboardShowEmail"> Vis min email på sæt, jeg opretter
-      </label>
-      <button onclick="submitOnboarding()">Gem og fortsæt</button>
-      <div id="onboardErrorBox"></div>
+    <div class="auth-card">
+      <div class="auth-icon"><i class="ti ti-sparkles"></i></div>
+      <h1 style="text-align:center;">Velkommen til Cortex</h1>
+      <p class="sub" style="text-align:center;">Fortæl lidt om dig selv, før du kommer i gang</p>
+      <div class="panel">
+        <div class="field-group">
+          <label class="field-label" for="onboardName">Dit navn</label>
+          <input class="input" type="text" id="onboardName" placeholder="Fornavn Efternavn">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="onboardSemester">Semester</label>
+          <select class="input" id="onboardSemester"></select>
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" id="onboardShowEmail"> Vis min email på sæt, jeg opretter
+        </label>
+        <button class="auth-submit" onclick="submitOnboarding()">Gem og fortsæt</button>
+        <div id="onboardErrorBox"></div>
+      </div>
     </div>
   </div>
 
@@ -152,20 +181,22 @@
     <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
     <h1>Min profil</h1>
     <div class="panel">
-      <input type="text" id="profileName" placeholder="Dit navn"
-        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
-        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;">
-      <p style="font-size:13px;opacity:0.6;margin:0 0 8px;">Email: <span id="profileEmailText"></span></p>
-      <select id="profileSemester"
-        style="width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;
-        padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;margin-bottom:8px;"></select>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:8px;">
+      <div class="field-group">
+        <label class="field-label" for="profileName">Dit navn</label>
+        <input class="input" type="text" id="profileName" placeholder="Fornavn Efternavn">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Email</label>
+        <p style="font-size:14px;margin:0;" id="profileEmailText"></p>
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="profileSemester">Semester</label>
+        <select class="input" id="profileSemester"></select>
+      </div>
+      <label class="checkbox-row">
         <input type="checkbox" id="profileShowEmail"> Vis min email på sæt, jeg opretter
       </label>
-      <div class="row" style="margin-top:0;">
-        <span></span>
-        <button onclick="saveProfile()">Gem ændringer</button>
-      </div>
+      <button class="auth-submit" onclick="saveProfile()">Gem ændringer</button>
       <div id="profileStatusBox"></div>
       <div id="profileErrorBox"></div>
     </div>
