@@ -306,11 +306,6 @@
     <p class="sub" id="appSub">Lav flashcards ud af dine noter</p>
     <div id="shareCodeBox" class="status" style="display:none;"></div>
 
-    <div class="settings" id="settingsRow">
-      <input type="password" id="apiKeyInput" placeholder="Indsæt din Anthropic API-nøgle (sk-ant-...)">
-      <button class="ghost small" onclick="saveApiKey()">Gem</button>
-    </div>
-
     <div class="panel">
       <textarea id="notes" placeholder="Indsæt dine noter her, f.eks. fra en forelæsning eller pensum..."></textarea>
       <div class="row">
@@ -458,7 +453,6 @@ let cards = [];
 let currentUser = null;
 let currentProfile = null;
 let authMode = 'login';
-let apiKey = localStorage.getItem('medikort_api_key') || '';
 let currentSemester = null;
 let currentDeck = null;
 
@@ -611,19 +605,8 @@ async function openDeck(deck){
     shareBox.style.display = 'none';
   }
 
-  initSettings();
   loadCards();
   showView('app');
-}
-
-function initSettings(){
-  document.getElementById('apiKeyInput').value = apiKey;
-}
-
-function saveApiKey(){
-  apiKey = document.getElementById('apiKeyInput').value.trim();
-  localStorage.setItem('medikort_api_key', apiKey);
-  showStatus('API-nøgle gemt i denne browser.');
 }
 
 function renderAuthBar(){
@@ -971,7 +954,6 @@ async function generate(){
   document.getElementById('errorBox').innerHTML = '';
   if(!isConfigured()){ showError(configWarning()); return; }
   if(!currentUser){ showError(requireLoginMessage()); return; }
-  if(!apiKey){ showError('Indsæt din API-nøgle øverst på siden først.'); return; }
   if(!notes){ showError('Indsæt lidt noter først.'); return; }
 
   const btn = document.getElementById('genBtn');
@@ -979,52 +961,24 @@ async function generate(){
   btn.innerHTML = '<span class="spin"></span>Genererer...';
 
   try{
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/.netlify/functions/generate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        max_tokens: 4000,
-        thinking: { type: 'disabled' },
-        messages: [{
-          role: 'user',
-          content: 'Du hjaelper en medicinstuderende paa ' + SEMESTERS[currentSemester] + ' med at lave eksamens-flashcards ud fra deres noter. Sattet, kortene tilhoerer, hedder "' + currentDeck.name + '".\n\n' +
-            'Laes noterne nedenfor og lav praecis 8 flashcards, der tester de vigtigste, eksamensrelevante fakta og koncepter. Foretraek spoergsmaal der tester forstaaelse (mekanismer, differentialdiagnoser, "hvorfor") frem for ren udenadslaere, hvor det giver mening.\n\n' +
-            'Svar KUN med et JSON array, ingen anden tekst, ingen markdown-fences.\n' +
-            'Hvert element skal se saadan ud: {"question": "...", "answer": "..."}\n\n' +
-            'NOTER:\n' + notes
-        }]
+        notes: notes,
+        semesterLabel: SEMESTERS[currentSemester],
+        deckName: currentDeck.name
       })
     });
 
     const data = await response.json();
     if(!response.ok){
-      const msg = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + response.status);
-      throw new Error(msg);
+      throw new Error((data && data.error) ? data.error : ('HTTP ' + response.status));
     }
-    if(!data || !Array.isArray(data.content)){
-      throw new Error('Uventet svar fra AI-tjenesten: ' + JSON.stringify(data).slice(0, 300));
+    if(!data || !Array.isArray(data.cards)){
+      throw new Error('Uventet svar fra serveren.');
     }
-    const textBlock = data.content.find(b => b.type === 'text' && b.text);
-    if(!textBlock){
-      throw new Error('AI-svaret indeholdt ingen tekst: ' + JSON.stringify(data.content).slice(0, 300));
-    }
-
-    let raw = textBlock.text.trim();
-    if(raw.indexOf('```') === 0){
-      raw = raw.replace(/^```json?/,'').replace(/```$/,'').trim();
-    }
-    let parsed;
-    try{
-      parsed = JSON.parse(raw);
-    }catch(parseErr){
-      throw new Error('Kunne ikke laese AI-svaret som JSON. Svar startede med: ' + raw.slice(0, 150));
-    }
+    const parsed = data.cards;
     const insertRows = parsed.map(c => ({ deck_id: currentDeck.id, question: c.question, answer: c.answer }));
 
     const { data: inserted, error: insertError } = await sb.from('cards').insert(insertRows).select();
