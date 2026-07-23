@@ -124,6 +124,13 @@
   .code-pill button{background:none;border:none;padding:2px;color:inherit;cursor:pointer;
     font-size:14px;display:flex;align-items:center;border-radius:4px;}
   .code-pill button:hover{background:rgba(15,110,86,0.12);}
+
+  .tab-row{display:flex;gap:0;margin-bottom:22px;border-bottom:1px solid var(--line);}
+  .tab-btn{background:none;border:none;border-bottom:2px solid transparent;padding:10px 4px;
+    margin-right:22px;font-size:14px;color:var(--ink);opacity:0.55;cursor:pointer;font-family:inherit;
+    transition:opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;}
+  .tab-btn.active{opacity:1;color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+  .tab-btn:hover{opacity:0.85;}
 </style>
 </head>
 <body>
@@ -236,58 +243,105 @@
     </div>
   </div>
 
-  <!-- VIEW: DECK PICKER -->
-  <div id="view-decks" style="display:none;">
+  <!-- VIEW: SEMESTER HUB -->
+  <div id="view-hub" style="display:none;">
     <button class="back-link" onclick="goToSemesters()"><i class="ti ti-arrow-left"></i>Tilbage til semestre</button>
     <h1 id="decksTitle">Vælg sæt</h1>
     <p class="sub" id="decksSub"></p>
 
-    <div class="sem-group">
-      <h3>Officielle sæt</h3>
-      <div class="program-grid">
-        <div class="program-card" onclick="openOfficialDeck('begynder')">
-          <div class="name">Begynder</div>
-          <div class="place">Grundlæggende overblik, godt at starte med</div>
+    <div class="tab-row">
+      <button class="tab-btn active" id="tabBtnFlashcards" onclick="switchHubTab('flashcards')">Flashcards</button>
+      <button class="tab-btn" id="tabBtnLitteratur" onclick="switchHubTab('litteratur')">Litteratur</button>
+      <button class="tab-btn" id="tabBtnMarked" onclick="switchHubTab('marked')">Køb og salg</button>
+    </div>
+
+    <!-- TAB: FLASHCARDS -->
+    <div id="hubTabFlashcards" class="hub-tab">
+      <div class="sem-group">
+        <h3>Officielle sæt</h3>
+        <div class="program-grid">
+          <div class="program-card" onclick="openOfficialDeck('begynder')">
+            <div class="name">Begynder</div>
+            <div class="place">Grundlæggende overblik, godt at starte med</div>
+          </div>
+          <div class="program-card" onclick="openOfficialDeck('midt-sem')">
+            <div class="name">Midt-sem</div>
+            <div class="place">Uddybende, midt i pensum</div>
+          </div>
+          <div class="program-card" onclick="openOfficialDeck('eksamen')">
+            <div class="name">Eksamen</div>
+            <div class="place">Fuld dybde, eksamensklar</div>
+          </div>
         </div>
-        <div class="program-card" onclick="openOfficialDeck('midt-sem')">
-          <div class="name">Midt-sem</div>
-          <div class="place">Uddybende, midt i pensum</div>
+      </div>
+
+      <div class="sem-group">
+        <h3>Brugerdefinerede sæt</h3>
+        <div class="program-card" onclick="openBrowseDecks()" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="name">Gennemse alle sæt</div>
+            <div class="place">Se hvad andre har delt for dette semester</div>
+          </div>
+          <i class="ti ti-chevron-right" style="opacity:0.4;font-size:18px;"></i>
         </div>
-        <div class="program-card" onclick="openOfficialDeck('eksamen')">
-          <div class="name">Eksamen</div>
-          <div class="place">Fuld dybde, eksamensklar</div>
+        <div class="panel">
+          <p style="font-size:13px;opacity:0.7;margin:0 0 10px;">Har du fået en delekode af en ven?</p>
+          <div class="row" style="margin-top:0;">
+            <input type="text" id="codeInput" placeholder="Indtast delekode, fx 2182U"
+              style="flex:1;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+              padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;text-transform:uppercase;">
+            <button class="ghost small" onclick="findByCode()">Find sæt</button>
+          </div>
         </div>
+        <div class="panel">
+          <p style="font-size:13px;opacity:0.7;margin:0 0 10px;">Opret dit eget sæt og få en delekode til dine venner.</p>
+          <div class="row" style="margin-top:0;">
+            <input type="text" id="newDeckName" placeholder="Navn på dit sæt, fx Farmakologi genopfriskning"
+              style="flex:1;background:var(--paper);border:1px solid var(--line);border-radius:6px;
+              padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;">
+            <button class="ghost small" onclick="createUserDeck()">Opret</button>
+          </div>
+        </div>
+        <div id="decksErrorBox"></div>
       </div>
     </div>
 
-    <div class="sem-group">
-      <h3>Brugerdefinerede sæt</h3>
-      <div class="program-card" onclick="openBrowseDecks()" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
-        <div>
-          <div class="name">Gennemse alle sæt</div>
-          <div class="place">Se hvad andre har delt for dette semester</div>
-        </div>
-        <i class="ti ti-chevron-right" style="opacity:0.4;font-size:18px;"></i>
-      </div>
+    <!-- TAB: LITTERATUR -->
+    <div id="hubTabLitteratur" class="hub-tab" style="display:none;">
       <div class="panel">
-        <p style="font-size:13px;opacity:0.7;margin:0 0 10px;">Har du fået en delekode af en ven?</p>
-        <div class="row" style="margin-top:0;">
-          <input type="text" id="codeInput" placeholder="Indtast delekode, fx 2182U"
-            style="flex:1;background:var(--paper);border:1px solid var(--line);border-radius:6px;
-            padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;text-transform:uppercase;">
-          <button class="ghost small" onclick="findByCode()">Find sæt</button>
+        <p style="font-size:13px;opacity:0.7;margin:0 0 10px;">Tilføj en bog, artikel eller andet pensum til dette semester.</p>
+        <div class="field-group">
+          <input class="input" type="text" id="litTitle" placeholder="Titel">
         </div>
+        <div class="field-group">
+          <input class="input" type="text" id="litAuthor" placeholder="Forfatter (valgfrit)">
+        </div>
+        <div class="field-group">
+          <input class="input" type="text" id="litUrl" placeholder="Link (valgfrit)">
+        </div>
+        <button onclick="submitLiterature()">Tilføj litteratur</button>
+        <div id="litErrorBox"></div>
       </div>
+      <div id="literatureList"></div>
+    </div>
+
+    <!-- TAB: KØB OG SALG -->
+    <div id="hubTabMarked" class="hub-tab" style="display:none;">
       <div class="panel">
-        <p style="font-size:13px;opacity:0.7;margin:0 0 10px;">Opret dit eget sæt og få en delekode til dine venner.</p>
-        <div class="row" style="margin-top:0;">
-          <input type="text" id="newDeckName" placeholder="Navn på dit sæt, fx Farmakologi genopfriskning"
-            style="flex:1;background:var(--paper);border:1px solid var(--line);border-radius:6px;
-            padding:8px 10px;font-size:14px;color:var(--ink);font-family:inherit;">
-          <button class="ghost small" onclick="createUserDeck()">Opret</button>
+        <p style="font-size:13px;opacity:0.7;margin:0 0 10px;">Sælg eller find brugte bøger og udstyr til dette semester.</p>
+        <div class="field-group">
+          <input class="input" type="text" id="marketTitle" placeholder="Hvad sælger du?">
         </div>
+        <div class="field-group">
+          <input class="input" type="text" id="marketDescription" placeholder="Beskrivelse (valgfrit)">
+        </div>
+        <div class="field-group">
+          <input class="input" type="number" id="marketPrice" placeholder="Pris i kr. (valgfrit)">
+        </div>
+        <button onclick="submitListing()">Opret annonce</button>
+        <div id="marketErrorBox"></div>
       </div>
-      <div id="decksErrorBox"></div>
+      <div id="marketplaceList"></div>
     </div>
   </div>
 
@@ -465,7 +519,7 @@ function buildSemesterGrids(){
     '<button class="sem-btn" onclick="selectSemester(\'' + id + '\')">' + SEMESTERS[id] + '</button>').join('');
 }
 
-const ALL_VIEWS = ['home','auth','onboarding','profile','semester','decks','browse','app','about','contact','privacy'];
+const ALL_VIEWS = ['home','auth','onboarding','profile','semester','hub','browse','app','about','contact','privacy'];
 
 function showView(name){
   ALL_VIEWS.forEach(v => {
@@ -502,7 +556,19 @@ function selectSemester(id){
   document.getElementById('decksErrorBox').innerHTML = '';
   document.getElementById('codeInput').value = '';
   document.getElementById('newDeckName').value = '';
-  showView('decks');
+  showView('hub');
+  switchHubTab('flashcards');
+}
+
+function switchHubTab(tab){
+  const panels = { flashcards: 'hubTabFlashcards', litteratur: 'hubTabLitteratur', marked: 'hubTabMarked' };
+  const buttons = { flashcards: 'tabBtnFlashcards', litteratur: 'tabBtnLitteratur', marked: 'tabBtnMarked' };
+  Object.keys(panels).forEach(k => {
+    document.getElementById(panels[k]).style.display = (k === tab) ? 'block' : 'none';
+    document.getElementById(buttons[k]).classList.toggle('active', k === tab);
+  });
+  if(tab === 'litteratur') loadLiterature();
+  if(tab === 'marked') loadMarketplace();
 }
 
 function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -926,6 +992,148 @@ async function loadBrowseDecks(){
 function openBrowsedDeck(i){
   const d = browseDecksCache[i];
   if(d) openDeck(d);
+}
+
+async function fetchProfilesMap(userIds){
+  const ids = [...new Set(userIds.filter(Boolean))];
+  let profilesMap = {};
+  if(ids.length > 0){
+    const { data } = await sb.from('profiles').select('*').in('id', ids);
+    (data || []).forEach(p => { profilesMap[p.id] = p; });
+  }
+  return profilesMap;
+}
+
+async function submitLiterature(){
+  const errBox = document.getElementById('litErrorBox');
+  errBox.innerHTML = '';
+  if(!isConfigured()){ errBox.innerHTML = configWarning(); return; }
+  if(!currentUser){ errBox.innerHTML = requireLoginMessage(); return; }
+  const title = document.getElementById('litTitle').value.trim();
+  const author = document.getElementById('litAuthor').value.trim();
+  const url = document.getElementById('litUrl').value.trim();
+  if(!title){ errBox.innerHTML = '<div class="error">Angiv en titel.</div>'; return; }
+
+  try{
+    const { error } = await sb.from('literature').insert({
+      semester: currentSemester, title: title, author: author || null, url: url || null, created_by: currentUser.id
+    });
+    if(error) throw error;
+    document.getElementById('litTitle').value = '';
+    document.getElementById('litAuthor').value = '';
+    document.getElementById('litUrl').value = '';
+    loadLiterature();
+  }catch(e){
+    errBox.innerHTML = '<div class="error">Kunne ikke tilføje: ' + friendlyError(e) + '</div>';
+  }
+}
+
+async function loadLiterature(){
+  const listEl = document.getElementById('literatureList');
+  listEl.innerHTML = '<div class="empty">Henter...</div>';
+  if(!isConfigured()){ listEl.innerHTML = configWarning(); return; }
+
+  try{
+    const { data, error } = await sb.from('literature').select('*')
+      .eq('semester', currentSemester).order('created_at', { ascending: false });
+    if(error) throw error;
+
+    if(!data || data.length === 0){
+      listEl.innerHTML = '<div class="empty">Ingen litteratur tilføjet endnu for dette semester.</div>';
+      return;
+    }
+
+    const profilesMap = await fetchProfilesMap(data.map(l => l.created_by));
+    listEl.innerHTML = data.map(l => {
+      const creator = l.created_by ? profilesMap[l.created_by] : null;
+      const creatorName = creator && creator.full_name ? creator.full_name : 'Ukendt';
+      const authorLine = l.author ? (' &middot; ' + escapeHtml(l.author)) : '';
+      const linkHtml = l.url ? ('<br><a href="' + escapeHtml(l.url) + '" target="_blank" rel="noopener" style="color:var(--accent);font-size:12px;">Åbn link</a>') : '';
+      return '<div class="browse-card" style="cursor:default;">' +
+        '<div class="name">' + escapeHtml(l.title) + '</div>' +
+        '<div class="meta">Tilføjet af ' + escapeHtml(creatorName) + authorLine + '<br>' + relativeTime(l.created_at) + '</div>' +
+        linkHtml +
+        '</div>';
+    }).join('');
+  }catch(e){
+    listEl.innerHTML = '<div class="error">Kunne ikke hente litteratur: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+async function submitListing(){
+  const errBox = document.getElementById('marketErrorBox');
+  errBox.innerHTML = '';
+  if(!isConfigured()){ errBox.innerHTML = configWarning(); return; }
+  if(!currentUser){ errBox.innerHTML = requireLoginMessage(); return; }
+  const title = document.getElementById('marketTitle').value.trim();
+  const description = document.getElementById('marketDescription').value.trim();
+  const priceRaw = document.getElementById('marketPrice').value.trim();
+  const price = priceRaw ? parseFloat(priceRaw) : null;
+  if(!title){ errBox.innerHTML = '<div class="error">Angiv hvad du sælger.</div>'; return; }
+
+  try{
+    const { error } = await sb.from('marketplace').insert({
+      semester: currentSemester, title: title, description: description || null, price: price, created_by: currentUser.id
+    });
+    if(error) throw error;
+    document.getElementById('marketTitle').value = '';
+    document.getElementById('marketDescription').value = '';
+    document.getElementById('marketPrice').value = '';
+    loadMarketplace();
+  }catch(e){
+    errBox.innerHTML = '<div class="error">Kunne ikke oprette annonce: ' + friendlyError(e) + '</div>';
+  }
+}
+
+let marketplaceCache = [];
+
+async function loadMarketplace(){
+  const listEl = document.getElementById('marketplaceList');
+  listEl.innerHTML = '<div class="empty">Henter...</div>';
+  if(!isConfigured()){ listEl.innerHTML = configWarning(); return; }
+
+  try{
+    const { data, error } = await sb.from('marketplace').select('*')
+      .eq('semester', currentSemester).order('created_at', { ascending: false });
+    if(error) throw error;
+
+    marketplaceCache = data || [];
+    if(marketplaceCache.length === 0){
+      listEl.innerHTML = '<div class="empty">Ingen annoncer endnu for dette semester.</div>';
+      return;
+    }
+
+    const profilesMap = await fetchProfilesMap(marketplaceCache.map(m => m.created_by));
+    listEl.innerHTML = marketplaceCache.map((m, i) => {
+      const creator = m.created_by ? profilesMap[m.created_by] : null;
+      const creatorName = creator && creator.full_name ? creator.full_name : 'Ukendt';
+      const contactLine = creator && creator.email ? (' &middot; ' + escapeHtml(creator.email)) : '';
+      const priceText = (m.price !== null && m.price !== undefined) ? (m.price + ' kr.') : 'Pris efter aftale';
+      const soldBadge = m.is_sold ? ' <span style="opacity:0.5;font-weight:400;">(solgt)</span>' : '';
+      const ownBtn = (currentUser && m.created_by === currentUser.id && !m.is_sold)
+        ? '<div style="margin-top:8px;"><button class="ghost small" onclick="markSold(' + i + ')">Markér som solgt</button></div>'
+        : '';
+      return '<div class="browse-card" style="cursor:default;">' +
+        '<div class="name">' + escapeHtml(m.title) + soldBadge + '</div>' +
+        '<div class="meta">' + priceText + ' &middot; ' + escapeHtml(creatorName) + contactLine +
+        (m.description ? ('<br>' + escapeHtml(m.description)) : '') +
+        '<br>' + relativeTime(m.created_at) + '</div>' +
+        ownBtn +
+        '</div>';
+    }).join('');
+  }catch(e){
+    listEl.innerHTML = '<div class="error">Kunne ikke hente annoncer: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+async function markSold(i){
+  const m = marketplaceCache[i];
+  if(!m) return;
+  try{
+    const { error } = await sb.from('marketplace').update({ is_sold: true }).eq('id', m.id);
+    if(error) throw error;
+    loadMarketplace();
+  }catch(e){}
 }
 
 function getKnownSet(deckId){
