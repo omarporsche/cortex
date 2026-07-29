@@ -131,6 +131,15 @@
     transition:opacity 0.15s ease, border-color 0.15s ease, color 0.15s ease;}
   .tab-btn.active{opacity:1;color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
   .tab-btn:hover{opacity:0.85;}
+
+  .hub-menu-grid{display:grid;grid-template-columns:1fr;gap:14px;margin:8px 0 4px;}
+  .hub-menu-card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:26px 20px;cursor:pointer;text-align:center;transition:border-color 0.15s ease, box-shadow 0.15s ease;}
+  .hub-menu-card:hover{border-color:var(--accent);box-shadow:0 3px 10px rgba(15,110,86,0.10);}
+  .hub-menu-icon{width:52px;height:52px;border-radius:50%;background:var(--accent-light);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:24px;color:var(--accent);}
+  .hub-menu-card .name{font-size:16px;font-weight:600;margin-bottom:4px;}
+  .hub-menu-card .place{font-size:13px;opacity:0.6;}
 </style>
 </head>
 <body>
@@ -245,18 +254,38 @@
 
   <!-- VIEW: SEMESTER HUB -->
   <div id="view-hub" style="display:none;">
-    <button class="back-link" onclick="goToSemesters()"><i class="ti ti-arrow-left"></i>Tilbage til semestre</button>
+    <button class="back-link" onclick="hubBack()"><i class="ti ti-arrow-left"></i><span id="hubBackText">Tilbage til semestre</span></button>
     <h1 id="decksTitle">Vælg sæt</h1>
     <p class="sub" id="decksSub"></p>
 
-    <div class="tab-row">
+    <div id="hubMenu">
+      <div class="hub-menu-grid">
+        <div class="hub-menu-card" onclick="switchHubTab('flashcards')">
+          <div class="hub-menu-icon"><i class="ti ti-cards"></i></div>
+          <div class="name">Flashcards</div>
+          <div class="place">Øv dig med officielle og brugerdefinerede sæt</div>
+        </div>
+        <div class="hub-menu-card" onclick="switchHubTab('litteratur')">
+          <div class="hub-menu-icon"><i class="ti ti-book-2"></i></div>
+          <div class="name">Litteratur</div>
+          <div class="place">Find pensum og anbefalet læsning</div>
+        </div>
+        <div class="hub-menu-card" onclick="switchHubTab('marked')">
+          <div class="hub-menu-icon"><i class="ti ti-shopping-cart"></i></div>
+          <div class="name">Køb og salg</div>
+          <div class="place">Køb og sælg brugte bøger og udstyr</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-row" style="display:none;">
       <button class="tab-btn active" id="tabBtnFlashcards" onclick="switchHubTab('flashcards')">Flashcards</button>
       <button class="tab-btn" id="tabBtnLitteratur" onclick="switchHubTab('litteratur')">Litteratur</button>
       <button class="tab-btn" id="tabBtnMarked" onclick="switchHubTab('marked')">Køb og salg</button>
     </div>
 
     <!-- TAB: FLASHCARDS -->
-    <div id="hubTabFlashcards" class="hub-tab">
+    <div id="hubTabFlashcards" class="hub-tab" style="display:none;">
       <div class="sem-group">
         <h3>Officielle sæt</h3>
         <div class="program-grid">
@@ -547,20 +576,49 @@ function goToSemesters(){
   showView('semester');
 }
 
+let hubMode = 'menu';
+
 function selectSemester(id){
   currentSemester = id;
   currentDeck = null;
   localStorage.removeItem('cortex_current_deck');
   const group = id.startsWith('b') ? 'Bachelor' : 'Kandidat';
+  document.getElementById('decksTitle').textContent = 'Vælg hvad du vil';
   document.getElementById('decksSub').textContent = 'Medicin, KU · ' + group + ' · ' + SEMESTERS[id];
   document.getElementById('decksErrorBox').innerHTML = '';
   document.getElementById('codeInput').value = '';
   document.getElementById('newDeckName').value = '';
   showView('hub');
-  switchHubTab('flashcards');
+  showHubMenu();
+}
+
+function hubBack(){
+  if(hubMode === 'menu'){
+    goToSemesters();
+  }else{
+    showHubMenu();
+  }
+}
+
+function showHubMenu(){
+  hubMode = 'menu';
+  document.getElementById('hubMenu').style.display = 'block';
+  document.querySelector('#view-hub .tab-row').style.display = 'none';
+  document.getElementById('hubTabFlashcards').style.display = 'none';
+  document.getElementById('hubTabLitteratur').style.display = 'none';
+  document.getElementById('hubTabMarked').style.display = 'none';
+  document.getElementById('hubBackText').textContent = 'Tilbage til semestre';
+  document.getElementById('decksTitle').textContent = 'Vælg hvad du vil';
 }
 
 function switchHubTab(tab){
+  hubMode = tab;
+  document.getElementById('hubMenu').style.display = 'none';
+  document.querySelector('#view-hub .tab-row').style.display = 'flex';
+  document.getElementById('hubBackText').textContent = 'Tilbage til oversigt';
+  const titles = { flashcards: 'Flashcards', litteratur: 'Litteratur', marked: 'Køb og salg' };
+  document.getElementById('decksTitle').textContent = titles[tab];
+
   const panels = { flashcards: 'hubTabFlashcards', litteratur: 'hubTabLitteratur', marked: 'hubTabMarked' };
   const buttons = { flashcards: 'tabBtnFlashcards', litteratur: 'tabBtnLitteratur', marked: 'tabBtnMarked' };
   Object.keys(panels).forEach(k => {
