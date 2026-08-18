@@ -147,7 +147,7 @@
 
   <!-- VIEW: HOME -->
   <div id="view-home">
-    <div id="authBar" style="display:flex;justify-content:flex-end;font-size:13px;margin-bottom:8px;"></div>
+    <div id="authBar" style="display:flex;justify-content:flex-end;gap:8px;font-size:13px;margin-bottom:8px;"></div>
     <h1>Cortex</h1>
     <p class="sub">Vælg dit studie</p>
     <input type="text" id="programSearch" placeholder="Søg efter studie eller universitet..."
@@ -165,6 +165,10 @@
       <h1 id="authTitle" style="text-align:center;">Log ind</h1>
       <p class="sub" id="authSub" style="text-align:center;">Log ind for at oprette og dele dine egne flashcards.</p>
       <div class="panel">
+        <div class="field-group" id="authSignupTop" style="display:none;">
+          <label class="field-label" for="authName">Navn</label>
+          <input class="input" type="text" id="authName" placeholder="Fornavn Efternavn">
+        </div>
         <div class="field-group">
           <label class="field-label" for="authEmail">Email</label>
           <input class="input" type="email" id="authEmail" placeholder="dig@eksempel.dk">
@@ -172,6 +176,16 @@
         <div class="field-group">
           <label class="field-label" for="authPassword">Adgangskode</label>
           <input class="input" type="password" id="authPassword" placeholder="Mindst 6 tegn">
+        </div>
+        <div id="authSignupBottom" style="display:none;">
+          <div class="field-group">
+            <label class="field-label" for="authPhone">Telefonnummer (valgfrit)</label>
+            <input class="input" type="tel" id="authPhone" placeholder="12 34 56 78">
+          </div>
+          <label class="checkbox-row" style="align-items:flex-start;">
+            <input type="checkbox" id="authTerms" style="margin-top:2px;">
+            <span>Jeg accepterer <a href="#" onclick="showInfo('terms');return false;" style="color:var(--accent);">vilkår og betingelser</a></span>
+          </label>
         </div>
         <button class="auth-submit" id="authSubmitBtn" onclick="submitAuth()">Log ind</button>
         <a href="#" class="auth-toggle" id="authToggleBtn" onclick="toggleAuthMode();return false;">Har du ikke en konto? Opret en</a>
@@ -473,18 +487,33 @@
     <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
     <h1>Privatliv og data</h1>
     <p style="font-size:14px;line-height:1.7;">
-      Cortex har ingen brugerkonti eller login. Sådan håndteres data:
+      Cortex bruger en simpel brugerkonto (email og adgangskode) til at kunne oprette og dele indhold. Sådan håndteres data:
     </p>
     <ul style="font-size:14px;line-height:1.9;">
+      <li>Din konto (email, navn, evt. telefonnummer og semester) gemmes i Cortex' database og bruges kun til at drive siden.</li>
       <li>Flashcards (spørgsmål og svar) i officielle sæt og brugersæt gemmes i en delt database, så de kan deles på tværs af studerende via delekoder.</li>
       <li>Din egen "kender jeg / kender jeg ikke"-markering af kort er personlig og gemmes kun lokalt i din browser — den påvirker ikke andres visning af samme sæt.</li>
-      <li>Din API-nøgle gemmes kun lokalt i din browser og bruges udelukkende til at kalde Anthropics API direkte fra din browser, når du genererer nye kort.</li>
-      <li>Når du genererer flashcards, sendes teksten fra dine noter direkte til Anthropic for at generere kortene.</li>
-      <li>Der er ingen tracking, analytics eller cookies på siden.</li>
+      <li>Dit navn vises på sæt, du selv opretter og deler. Din email vises kun, hvis du selv slår det til i din profil.</li>
+      <li>Der er ingen tracking, analytics eller reklamer på siden.</li>
     </ul>
+  </div>
+
+  <!-- VIEW: TERMS -->
+  <div id="view-terms" style="display:none;">
+    <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
+    <h1>Vilkår og betingelser</h1>
     <p style="font-size:14px;line-height:1.7;">
-      Fordi der endnu ikke er login, kan alle med adgang til siden i princippet tilføje kort til
-      ethvert sæt, inklusive officielle sæt. Det kan ændre sig, efterhånden som siden udvikles.
+      Ved at oprette en konto på Cortex accepterer du følgende:
+    </p>
+    <ul style="font-size:14px;line-height:1.9;">
+      <li>Cortex er et uofficielt, studenterdrevet værktøj og ikke en del af KU's officielle undervisning.</li>
+      <li>Indhold du opretter eller deler (flashcards, litteraturhenvisninger, køb-og-salg-annoncer) skal være sagligt og må ikke krænke andres rettigheder eller være spam.</li>
+      <li>Du er selv ansvarlig for rigtigheden af det, du deler, og for aftaler du indgår med andre brugere, fx via køb-og-salg.</li>
+      <li>Dine oplysninger behandles som beskrevet på siden om <a href="#" onclick="showInfo('privacy');return false;" style="color:var(--accent);">privatliv og data</a>.</li>
+      <li>Cortex kan til enhver tid ændre eller lukke funktioner, da det er et løbende studenterprojekt under udvikling.</li>
+    </ul>
+    <p style="font-size:13px;opacity:0.6;line-height:1.6;">
+      (Dette er en foreløbig, uformel tekst — udskift gerne med noget mere formelt senere.)
     </p>
   </div>
 
@@ -493,6 +522,7 @@
     <a href="#" onclick="showInfo('about');return false;" style="color:var(--ink);opacity:0.6;text-decoration:none;">Om os</a>
     <a href="#" onclick="showInfo('contact');return false;" style="color:var(--ink);opacity:0.6;text-decoration:none;">Kontakt os</a>
     <a href="#" onclick="showInfo('privacy');return false;" style="color:var(--ink);opacity:0.6;text-decoration:none;">Privatliv</a>
+    <a href="#" onclick="showInfo('terms');return false;" style="color:var(--ink);opacity:0.6;text-decoration:none;">Vilkår</a>
   </div>
 </div>
 
@@ -567,7 +597,7 @@ function buildSemesterGrids(){
     '<button class="sem-btn" onclick="selectSemester(\'' + id + '\')">' + SEMESTERS[id] + '</button>').join('');
 }
 
-const ALL_VIEWS = ['home','auth','onboarding','profile','semester','hub','browse','app','about','contact','privacy'];
+const ALL_VIEWS = ['home','auth','onboarding','profile','semester','hub','browse','app','about','contact','privacy','terms'];
 
 function showView(name){
   ALL_VIEWS.forEach(v => {
@@ -764,7 +794,8 @@ function renderAuthBar(){
       ' &middot; <a href="#" onclick="openProfileView();return false;" style="color:var(--accent);">Min profil</a>' +
       ' &middot; <a href="#" onclick="logOut();return false;" style="color:var(--accent);">Log ud</a>';
   }else{
-    bar.innerHTML = '<a href="#" onclick="openAuthView();return false;" style="color:var(--accent);">Log ind / opret konto</a>';
+    bar.innerHTML = '<button class="ghost small" onclick="openAuthView(\'login\')">Log ind</button>' +
+      '<button class="small" onclick="openAuthView(\'signup\')">Opret konto</button>';
   }
 }
 
@@ -773,10 +804,13 @@ function toggleAuthMode(){
   updateAuthLabels();
 }
 
-function openAuthView(){
-  authMode = 'login';
+function openAuthView(mode){
+  authMode = (mode === 'signup') ? 'signup' : 'login';
+  document.getElementById('authName').value = '';
   document.getElementById('authEmail').value = '';
   document.getElementById('authPassword').value = '';
+  document.getElementById('authPhone').value = '';
+  document.getElementById('authTerms').checked = false;
   updateAuthLabels();
   showView('auth');
 }
@@ -784,7 +818,10 @@ function openAuthView(){
 function updateAuthLabels(){
   document.getElementById('authErrorBox').innerHTML = '';
   document.getElementById('authStatusBox').innerHTML = '';
-  if(authMode === 'login'){
+  const isSignup = authMode === 'signup';
+  document.getElementById('authSignupTop').style.display = isSignup ? 'block' : 'none';
+  document.getElementById('authSignupBottom').style.display = isSignup ? 'block' : 'none';
+  if(!isSignup){
     document.getElementById('authTitle').textContent = 'Log ind';
     document.getElementById('authSubmitBtn').textContent = 'Log ind';
     document.getElementById('authToggleBtn').textContent = 'Har du ikke en konto? Opret en';
@@ -818,6 +855,15 @@ async function submitAuth(){
   const password = document.getElementById('authPassword').value;
   if(!email || !password){ errBox.innerHTML = '<div class="error">Udfyld både email og adgangskode.</div>'; return; }
 
+  let signupName = '', signupPhone = '';
+  if(authMode === 'signup'){
+    signupName = document.getElementById('authName').value.trim();
+    signupPhone = document.getElementById('authPhone').value.trim();
+    const termsAccepted = document.getElementById('authTerms').checked;
+    if(!signupName){ errBox.innerHTML = '<div class="error">Indtast dit navn.</div>'; return; }
+    if(!termsAccepted){ errBox.innerHTML = '<div class="error">Du skal acceptere vilkår og betingelser for at oprette en konto.</div>'; return; }
+  }
+
   const btn = document.getElementById('authSubmitBtn');
   btn.disabled = true;
 
@@ -825,6 +871,13 @@ async function submitAuth(){
     if(authMode === 'signup'){
       const { data, error } = await sb.auth.signUp({ email, password });
       if(error) throw error;
+
+      localStorage.setItem('cortex_pending_profile', JSON.stringify({
+        full_name: signupName,
+        phone: signupPhone || null,
+        terms_accepted_at: new Date().toISOString()
+      }));
+
       if(data.session){
         currentUser = data.session.user;
         await loadProfileForCurrentUser();
@@ -888,8 +941,18 @@ async function loadProfileForCurrentUser(){
   }catch(e){ currentProfile = null; }
 }
 
+function getPendingProfile(){
+  try{ return JSON.parse(localStorage.getItem('cortex_pending_profile') || 'null'); }
+  catch(e){ return null; }
+}
+
+function clearPendingProfile(){
+  localStorage.removeItem('cortex_pending_profile');
+}
+
 function openOnboarding(){
-  document.getElementById('onboardName').value = '';
+  const pending = getPendingProfile();
+  document.getElementById('onboardName').value = (pending && pending.full_name) ? pending.full_name : '';
   buildSemesterOptions(document.getElementById('onboardSemester'), '');
   document.getElementById('onboardShowEmail').checked = false;
   document.getElementById('onboardErrorBox').innerHTML = '';
@@ -904,15 +967,20 @@ async function submitOnboarding(){
   const showEmail = document.getElementById('onboardShowEmail').checked;
   if(!name){ errBox.innerHTML = '<div class="error">Indtast dit navn.</div>'; return; }
 
+  const pending = getPendingProfile();
+
   try{
     const { error } = await sb.from('profiles').insert({
       id: currentUser.id,
       full_name: name,
       semester: semester || null,
       show_email: showEmail,
-      email: showEmail ? currentUser.email : null
+      email: showEmail ? currentUser.email : null,
+      phone: pending ? pending.phone : null,
+      terms_accepted_at: pending ? pending.terms_accepted_at : null
     });
     if(error) throw error;
+    clearPendingProfile();
     await loadProfileForCurrentUser();
     renderAuthBar();
     goHome();
