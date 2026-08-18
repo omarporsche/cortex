@@ -43,14 +43,20 @@ exports.handler = async function (event) {
   // short-lived signed URL, which we fetch server-side. Claude's own ceiling is ~32MB / 100 pages.
   let pdfBase64 = '';
   if (pdfUrl) {
+    try {
+      new URL(pdfUrl);
+    } catch (e) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Ugyldig eller udløbet PDF-reference. Vælg filen igen.' }) };
+    }
+
     let pdfResp;
     try {
       pdfResp = await fetch(pdfUrl);
     } catch (e) {
-      return { statusCode: 502, body: JSON.stringify({ error: 'Kunne ikke hente PDF\'en fra storage.' }) };
+      return { statusCode: 502, body: JSON.stringify({ error: 'Kunne ikke hente PDF\'en fra storage (' + (e.message || 'netværksfejl') + ').' }) };
     }
     if (!pdfResp.ok) {
-      return { statusCode: 502, body: JSON.stringify({ error: 'Kunne ikke hente PDF\'en fra storage (status ' + pdfResp.status + ').' }) };
+      return { statusCode: 502, body: JSON.stringify({ error: 'Kunne ikke hente PDF\'en fra storage (status ' + pdfResp.status + '). Prøv at vælge filen igen.' }) };
     }
     const arrayBuf = await pdfResp.arrayBuffer();
     if (arrayBuf.byteLength > 30_000_000) {
