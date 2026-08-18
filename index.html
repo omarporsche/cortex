@@ -13,10 +13,13 @@
     --line:#D8D2C0; --line-dark:#3A3930;
     --accent:#0F6E56; --accent-light:#E1F5EE;
     --accent-dark:#5DCAA5; --accent-light-dark:#123A2E;
+    --warn:#A66A1E; --warn-light:#FBEEDA;
+    --warn-dark:#E0AD62; --warn-light-dark:#3A2C14;
   }
   @media (prefers-color-scheme: dark){
     :root{ --paper:var(--paper-dark); --ink:var(--ink-dark); --card:var(--card-dark);
-      --line:var(--line-dark); --accent-light:var(--accent-light-dark); --accent:var(--accent-dark); }
+      --line:var(--line-dark); --accent-light:var(--accent-light-dark); --accent:var(--accent-dark);
+      --warn:var(--warn-dark); --warn-light:var(--warn-light-dark); }
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,Segoe UI,sans-serif;}
@@ -108,6 +111,16 @@
   .review-face .tag{font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:14px;}
   .review-face .txt{font-size:19px;line-height:1.55;overflow-y:auto;max-height:180px;}
   .review-face.back{transform:rotateY(180deg);background:var(--accent-light);}
+
+  .feedback-box{border-radius:12px;padding:14px 16px;margin-bottom:12px;}
+  .feedback-box.good{background:var(--accent-light);}
+  .feedback-box.review{background:var(--warn-light);}
+  .feedback-box .feedback-title{font-size:12px;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.05em;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+  .feedback-box.good .feedback-title{color:var(--accent);}
+  .feedback-box.review .feedback-title{color:var(--warn);}
+  .feedback-box ul{margin:0;padding-left:18px;font-size:14px;line-height:1.65;color:var(--ink);}
+  .feedback-box ul li{margin-bottom:2px;}
 
 
   .program-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:20px;}
@@ -507,7 +520,7 @@
       </div>
 
       <button id="feedbackBtn" class="ghost" style="width:100%;margin-top:18px;" onclick="requestFeedback()">
-        <i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>Få AI-feedback på din session
+        <i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>AI Feedback
       </button>
       <div id="feedbackErrorBox"></div>
       <div id="feedbackBox" style="display:none;" class="panel">
@@ -1651,7 +1664,7 @@ function finishReview(){
   document.getElementById('feedbackErrorBox').innerHTML = '';
   document.getElementById('feedbackBtn').style.display = 'block';
   document.getElementById('feedbackBtn').disabled = false;
-  document.getElementById('feedbackBtn').innerHTML = '<i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>Få AI-feedback på din session';
+  document.getElementById('feedbackBtn').innerHTML = '<i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>AI Feedback';
   showView('review-results');
 }
 
@@ -1664,7 +1677,7 @@ async function requestFeedback(){
 
   const btn = document.getElementById('feedbackBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>Analyserer din session...';
+  btn.innerHTML = '<span class="spin"></span>Analyserer...';
 
   try{
     const response = await fetch('/.netlify/functions/feedback', {
@@ -1680,13 +1693,31 @@ async function requestFeedback(){
     if(!response.ok){
       throw new Error((data && data.error) ? data.error : ('HTTP ' + response.status));
     }
-    document.getElementById('feedbackText').textContent = data.feedback;
+
+    const strengths = Array.isArray(data.strengths) ? data.strengths : [];
+    const review = Array.isArray(data.review) ? data.review : [];
+    let html = '';
+    if(strengths.length > 0){
+      html += '<div class="feedback-box good">' +
+        '<div class="feedback-title"><i class="ti ti-check"></i>Det har du styr på</div>' +
+        '<ul>' + strengths.map(s => '<li>' + escapeHtml(s) + '</li>').join('') + '</ul></div>';
+    }
+    if(review.length > 0){
+      html += '<div class="feedback-box review">' +
+        '<div class="feedback-title"><i class="ti ti-book"></i>Læs op på</div>' +
+        '<ul>' + review.map(s => '<li>' + escapeHtml(s) + '</li>').join('') + '</ul></div>';
+    }
+    if(strengths.length === 0 && review.length === 0){
+      html = '<p style="font-size:14px;opacity:0.7;">Kunne ikke udlede noget specifikt mønster fra denne session.</p>';
+    }
+
+    document.getElementById('feedbackText').innerHTML = html;
     document.getElementById('feedbackBox').style.display = 'block';
     btn.style.display = 'none';
   }catch(e){
     errBox.innerHTML = '<div class="error">Kunne ikke hente feedback: ' + (e.message || 'ukendt fejl') + '</div>';
     btn.disabled = false;
-    btn.innerHTML = '<i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>Få AI-feedback på din session';
+    btn.innerHTML = '<i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>AI Feedback';
   }
 }
 
