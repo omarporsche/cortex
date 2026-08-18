@@ -96,6 +96,20 @@
     color:var(--accent);text-decoration:none;}
   .auth-toggle:hover{text-decoration:underline;}
 
+  #reviewTimer{position:fixed;top:16px;left:16px;background:var(--card);border:1px solid var(--line);
+    border-radius:20px;padding:7px 16px;font-size:13px;font-weight:700;color:var(--accent);
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;z-index:20;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+  .review-card{perspective:1400px;height:280px;cursor:pointer;}
+  .review-card .review-card-inner{position:relative;width:100%;height:100%;transition:transform 0.5s;transform-style:preserve-3d;}
+  .review-card.flipped .review-card-inner{transform:rotateY(180deg);}
+  .review-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:18px;
+    border:1px solid var(--line);background:var(--card);padding:30px 26px;
+    display:flex;flex-direction:column;justify-content:center;box-shadow:0 6px 20px rgba(0,0,0,0.07);}
+  .review-face .tag{font-size:12px;text-transform:uppercase;letter-spacing:0.06em;color:var(--accent);margin-bottom:14px;}
+  .review-face .txt{font-size:19px;line-height:1.55;overflow-y:auto;max-height:180px;}
+  .review-face.back{transform:rotateY(180deg);background:var(--accent-light);}
+
+
   .program-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:20px;}
   .program-card{background:var(--card);border:1px solid var(--line);border-radius:12px;
     padding:20px;cursor:pointer;text-align:left;}
@@ -370,7 +384,7 @@
 
     <!-- TAB: LITTERATUR -->
     <div id="hubTabLitteratur" class="hub-tab" style="display:none;">
-      <div class="panel">
+      <div class="panel" id="litAddPanel" style="display:none;">
         <p style="font-size:13px;opacity:0.7;margin:0 0 10px;">Tilføj en bog, artikel eller andet pensum til dette semester.</p>
         <div class="field-group">
           <input class="input" type="text" id="litTitle" placeholder="Titel">
@@ -415,35 +429,88 @@
     <div id="browseDecksList"></div>
   </div>
 
-  <!-- VIEW: FLASHCARD APP -->
+  <!-- VIEW: FLASHCARD APP (deck landing) -->
   <div id="view-app" style="display:none;">
     <button class="back-link" onclick="selectSemester(currentSemester)"><i class="ti ti-arrow-left"></i>Tilbage til sæt</button>
     <h1 id="appTitle">Cortex</h1>
     <p class="sub" id="appSub">Lav flashcards ud af dine noter</p>
     <div id="shareCodeBox" class="status" style="display:none;"></div>
 
-    <div class="panel">
-      <textarea id="notes" placeholder="Indsæt dine noter her, f.eks. fra en forelæsning eller pensum..."></textarea>
-      <div class="row">
-        <span class="count" id="charCount">0 tegn</span>
-        <div style="display:flex;gap:8px;">
-          <input type="file" id="fileInput" accept=".txt,.md,.csv,.apkg" style="display:none" onchange="handleFile(event)">
-          <button class="ghost" onclick="document.getElementById('fileInput').click()">
-            <i class="ti ti-upload" style="font-size:15px;vertical-align:-2px;margin-right:4px;"></i>Importér fil
-          </button>
-          <button id="genBtn" onclick="generate()">Generér flashcards</button>
+    <div class="stats" id="stats" style="display:none;">
+      <div class="stat"><div class="n" id="totalN">0</div><div class="l">kort i sættet</div></div>
+    </div>
+
+    <button id="startReviewBtn" class="auth-submit" onclick="startReview()" disabled>Start</button>
+    <div id="emptyDeckHint" class="empty" style="display:none;">Ingen kort i dette sæt endnu — tilføj nogle nedenfor for at komme i gang.</div>
+
+    <a href="#" id="toggleAddCards" onclick="toggleAddCardsPanel();return false;"
+      style="display:block;text-align:center;font-size:13px;color:var(--accent);margin:20px 0 14px;">+ Tilføj flere kort til sættet</a>
+
+    <div id="addCardsPanel" style="display:none;">
+      <div class="panel">
+        <textarea id="notes" placeholder="Indsæt dine noter her, f.eks. fra en forelæsning eller pensum..."></textarea>
+        <div class="row">
+          <span class="count" id="charCount">0 tegn</span>
+          <div style="display:flex;gap:8px;">
+            <input type="file" id="fileInput" accept=".txt,.md,.csv,.apkg" style="display:none" onchange="handleFile(event)">
+            <button class="ghost" onclick="document.getElementById('fileInput').click()">
+              <i class="ti ti-upload" style="font-size:15px;vertical-align:-2px;margin-right:4px;"></i>Importér fil
+            </button>
+            <button id="genBtn" onclick="generate()">Generér flashcards</button>
+          </div>
+        </div>
+        <div id="statusBox"></div>
+        <div id="errorBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW: REVIEW SESSION -->
+  <div id="view-review" style="display:none;">
+    <div id="reviewTimer">0:00</div>
+    <a href="#" onclick="quitReview();return false;" style="display:block;text-align:right;font-size:13px;color:var(--ink);opacity:0.5;margin-bottom:8px;">Afslut øvelse</a>
+    <div style="max-width:480px;margin:20px auto 0;">
+      <p class="sub" id="reviewProgress" style="text-align:center;margin-bottom:18px;"></p>
+      <div class="review-card" id="reviewCard" onclick="flipReviewCard()">
+        <div class="review-card-inner">
+          <div class="review-face front">
+            <div class="tag">Spørgsmål</div>
+            <div class="txt" id="reviewQuestionText"></div>
+          </div>
+          <div class="review-face back">
+            <div class="tag">Svar</div>
+            <div class="txt" id="reviewAnswerText"></div>
+          </div>
         </div>
       </div>
-      <div id="statusBox"></div>
-      <div id="errorBox"></div>
-    </div>
+      <p style="font-size:12px;opacity:0.5;text-align:center;margin-top:12px;">Klik på kortet eller tryk mellemrum for at vende det</p>
 
-    <div class="stats" id="stats" style="display:none;">
-      <div class="stat"><div class="n" id="totalN">0</div><div class="l">kort i alt</div></div>
-      <div class="stat"><div class="n" id="knownN">0</div><div class="l">kan du</div></div>
+      <div id="ratingButtons" style="display:none;gap:10px;margin-top:22px;">
+        <button onclick="rateCard('hard')" style="flex:1;background:#B5493D;border-color:#B5493D;">Svært</button>
+        <button onclick="rateCard('medium')" style="flex:1;background:#C08A2E;border-color:#C08A2E;">Mellem</button>
+        <button onclick="rateCard('easy')" style="flex:1;background:#3E8F5F;border-color:#3E8F5F;">Nemt</button>
+      </div>
     </div>
+  </div>
 
-    <div class="deck" id="deck"></div>
+  <!-- VIEW: REVIEW RESULTS -->
+  <div id="view-review-results" style="display:none;">
+    <div style="max-width:420px;margin:60px auto 0;text-align:center;">
+      <div class="auth-icon"><i class="ti ti-confetti"></i></div>
+      <h1>Godt gået!</h1>
+      <p class="sub" id="resultsSummary"></p>
+
+      <div class="stats" style="margin-top:20px;">
+        <div class="stat"><div class="n" id="resultHard">0</div><div class="l">svært</div></div>
+        <div class="stat"><div class="n" id="resultMedium">0</div><div class="l">mellem</div></div>
+        <div class="stat"><div class="n" id="resultEasy">0</div><div class="l">nemt</div></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:24px;">
+        <button class="ghost" style="flex:1;" onclick="showView('app')">Til sættet</button>
+        <button style="flex:1;" onclick="startReview()">Øv igen</button>
+      </div>
+    </div>
   </div>
 
   <!-- VIEW: ABOUT -->
@@ -597,7 +664,7 @@ function buildSemesterGrids(){
     '<button class="sem-btn" onclick="selectSemester(\'' + id + '\')">' + SEMESTERS[id] + '</button>').join('');
 }
 
-const ALL_VIEWS = ['home','auth','onboarding','profile','semester','hub','browse','app','about','contact','privacy','terms'];
+const ALL_VIEWS = ['home','auth','onboarding','profile','semester','hub','browse','app','review','review-results','about','contact','privacy','terms'];
 
 function showView(name){
   ALL_VIEWS.forEach(v => {
@@ -674,7 +741,10 @@ function switchHubTab(tab){
     document.getElementById(panels[k]).style.display = (k === tab) ? 'block' : 'none';
     document.getElementById(buttons[k]).classList.toggle('active', k === tab);
   });
-  if(tab === 'litteratur') loadLiterature();
+  if(tab === 'litteratur'){
+    document.getElementById('litAddPanel').style.display = (currentProfile && currentProfile.is_admin) ? 'block' : 'none';
+    loadLiterature();
+  }
   if(tab === 'marked') loadMarketplace();
 }
 
@@ -1154,6 +1224,7 @@ async function submitLiterature(){
   errBox.innerHTML = '';
   if(!isConfigured()){ errBox.innerHTML = configWarning(); return; }
   if(!currentUser){ errBox.innerHTML = requireLoginMessage(); return; }
+  if(!currentProfile || !currentProfile.is_admin){ errBox.innerHTML = '<div class="error">Kun administratorer kan tilføje litteratur.</div>'; return; }
   const title = document.getElementById('litTitle').value.trim();
   const author = document.getElementById('litAuthor').value.trim();
   const url = document.getElementById('litUrl').value.trim();
@@ -1281,14 +1352,6 @@ async function markSold(i){
   }catch(e){}
 }
 
-function getKnownSet(deckId){
-  try{ return new Set(JSON.parse(localStorage.getItem('cortex_known_' + deckId) || '[]')); }
-  catch(e){ return new Set(); }
-}
-function saveKnownSet(deckId, set){
-  localStorage.setItem('cortex_known_' + deckId, JSON.stringify([...set]));
-}
-
 async function loadCards(){
   if(!isConfigured()){
     cards = [];
@@ -1300,8 +1363,7 @@ async function loadCards(){
     const { data, error } = await sb.from('cards').select('*')
       .eq('deck_id', currentDeck.id).order('created_at', { ascending: true });
     if(error) throw error;
-    const known = getKnownSet(currentDeck.id);
-    cards = (data || []).map(c => ({ id: c.id, question: c.question, answer: c.answer, known: known.has(c.id) }));
+    cards = (data || []).map(c => ({ id: c.id, question: c.question, answer: c.answer }));
   }catch(e){
     cards = [];
     showError('Kunne ikke hente kort: ' + (e.message || 'ukendt fejl'));
@@ -1349,7 +1411,7 @@ async function generate(){
     const { data: inserted, error: insertError } = await sb.from('cards').insert(insertRows).select();
     if(insertError) throw insertError;
 
-    const newCards = inserted.map(c => ({ id: c.id, question: c.question, answer: c.answer, known: false }));
+    const newCards = inserted.map(c => ({ id: c.id, question: c.question, answer: c.answer }));
     cards = [...newCards, ...cards];
     notesEl.value = '';
     document.getElementById('charCount').textContent = '0 tegn';
@@ -1421,7 +1483,7 @@ async function handleFile(ev){
     const { data: inserted, error } = await sb.from('cards').insert(insertRows).select();
     if(error) throw error;
 
-    const newCards = inserted.map(c => ({ id: c.id, question: c.question, answer: c.answer, known: false }));
+    const newCards = inserted.map(c => ({ id: c.id, question: c.question, answer: c.answer }));
     cards = [...newCards, ...cards];
     render();
     showStatus('Importerede ' + newCards.length + ' kort.');
@@ -1459,52 +1521,129 @@ async function parseApkg(file){
   }).filter(c => c.question);
 }
 
-function toggleFlip(id){
-  document.getElementById('card-' + id).classList.toggle('flipped');
-}
-
-function toggleKnown(id, ev){
-  ev.stopPropagation();
-  const known = getKnownSet(currentDeck.id);
-  if(known.has(id)) known.delete(id); else known.add(id);
-  saveKnownSet(currentDeck.id, known);
-  const c = cards.find(c => c.id === id);
-  if(c) c.known = known.has(id);
-  render();
+function toggleAddCardsPanel(){
+  const panel = document.getElementById('addCardsPanel');
+  const isOpen = panel.style.display === 'block';
+  panel.style.display = isOpen ? 'none' : 'block';
+  document.getElementById('toggleAddCards').textContent = isOpen ? '+ Tilføj flere kort til sættet' : '– Skjul';
 }
 
 function render(){
-  const deckEl = document.getElementById('deck');
+  const total = cards.length;
   const stats = document.getElementById('stats');
-  if(cards.length === 0){
-    stats.style.display = 'none';
-    deckEl.innerHTML = '<div class="empty">Ingen flashcards endnu i dette sæt. Indsæt noter ovenfor for at komme i gang.</div>';
-    return;
-  }
-  stats.style.display = 'flex';
-  document.getElementById('totalN').textContent = cards.length;
-  document.getElementById('knownN').textContent = cards.filter(c=>c.known).length;
-
-  deckEl.innerHTML = cards.map(c => `
-    <div class="card" id="card-${c.id}" onclick="toggleFlip('${c.id}')">
-      <div class="card-inner">
-        <div class="face front">
-          <div class="card-top">
-            <button class="icon-btn" onclick="toggleKnown('${c.id}', event)" title="Marker som kendt">
-              <i class="ti ti-${c.known ? 'check' : 'circle'}"></i>
-            </button>
-          </div>
-          <div class="tag">Spørgsmål</div>
-          <div class="txt">${escapeHtml(c.question)}</div>
-        </div>
-        <div class="face back">
-          <div class="tag">Svar</div>
-          <div class="txt">${escapeHtml(c.answer)}</div>
-        </div>
-      </div>
-    </div>
-  `).join('');
+  stats.style.display = total > 0 ? 'flex' : 'none';
+  document.getElementById('totalN').textContent = total;
+  document.getElementById('startReviewBtn').disabled = total === 0;
+  document.getElementById('emptyDeckHint').style.display = total === 0 ? 'block' : 'none';
 }
+
+// ---- Review session ----
+let reviewQueue = [];
+let reviewIndex = 0;
+let reviewFlipped = false;
+let reviewStats = { hard: 0, medium: 0, easy: 0 };
+let reviewStartTime = null;
+let reviewTimerInterval = null;
+
+function shuffleArray(arr){
+  const a = arr.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+  }
+  return a;
+}
+
+function startReview(){
+  if(!cards || cards.length === 0) return;
+  reviewQueue = shuffleArray(cards);
+  reviewIndex = 0;
+  reviewStats = { hard: 0, medium: 0, easy: 0 };
+  reviewStartTime = Date.now();
+  showView('review');
+  showReviewCard();
+  startReviewTimer();
+}
+
+function startReviewTimer(){
+  updateReviewTimer();
+  if(reviewTimerInterval) clearInterval(reviewTimerInterval);
+  reviewTimerInterval = setInterval(updateReviewTimer, 1000);
+}
+
+function updateReviewTimer(){
+  const el = document.getElementById('reviewTimer');
+  if(!el || !reviewStartTime) return;
+  const elapsed = Math.floor((Date.now() - reviewStartTime) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function showReviewCard(){
+  const c = reviewQueue[reviewIndex];
+  reviewFlipped = false;
+  document.getElementById('reviewCard').classList.remove('flipped');
+  document.getElementById('reviewQuestionText').textContent = c.question;
+  document.getElementById('reviewAnswerText').textContent = c.answer;
+  document.getElementById('reviewProgress').textContent = 'Kort ' + (reviewIndex + 1) + ' af ' + reviewQueue.length;
+  document.getElementById('ratingButtons').style.display = 'none';
+}
+
+function flipReviewCard(){
+  if(reviewFlipped) return;
+  reviewFlipped = true;
+  document.getElementById('reviewCard').classList.add('flipped');
+  document.getElementById('ratingButtons').style.display = 'flex';
+}
+
+function rateCard(rating){
+  if(!reviewFlipped) return;
+  reviewStats[rating]++;
+  const c = reviewQueue[reviewIndex];
+  saveCardRating(currentDeck.id, c.id, rating);
+
+  reviewIndex++;
+  if(reviewIndex >= reviewQueue.length){
+    finishReview();
+  }else{
+    showReviewCard();
+  }
+}
+
+function saveCardRating(deckId, cardId, rating){
+  try{
+    const key = 'cortex_ratings_' + deckId;
+    const all = JSON.parse(localStorage.getItem(key) || '{}');
+    all[cardId] = { rating: rating, at: Date.now() };
+    localStorage.setItem(key, JSON.stringify(all));
+  }catch(e){}
+}
+
+function quitReview(){
+  clearInterval(reviewTimerInterval);
+  showView('app');
+}
+
+function finishReview(){
+  clearInterval(reviewTimerInterval);
+  const elapsed = Math.floor((Date.now() - reviewStartTime) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  document.getElementById('resultsSummary').textContent =
+    reviewQueue.length + ' kort gennemgået på ' + m + ' min ' + (s < 10 ? '0' : '') + s + ' sek.';
+  document.getElementById('resultHard').textContent = reviewStats.hard;
+  document.getElementById('resultMedium').textContent = reviewStats.medium;
+  document.getElementById('resultEasy').textContent = reviewStats.easy;
+  showView('review-results');
+}
+
+document.addEventListener('keydown', function(e){
+  if(document.getElementById('view-review').style.display !== 'none' && e.code === 'Space'){
+    e.preventDefault();
+    flipReviewCard();
+  }
+});
 
 function escapeHtml(s){
   const d = document.createElement('div');
