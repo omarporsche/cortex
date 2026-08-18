@@ -1472,22 +1472,27 @@ async function loadCards(){
 
 let selectedPdfFile = null;
 let selectedPdfPageCount = null;
+let selectedPdfStoragePath = null;
+let selectedPdfSignedUrl = null;
 
 document.getElementById('notes').addEventListener('input', (e)=>{
   document.getElementById('charCount').textContent = e.target.value.length + ' tegn';
   if(e.target.value.trim().length > 0 && selectedPdfFile){
     selectedPdfFile = null;
     selectedPdfPageCount = null;
+    selectedPdfStoragePath = null;
+    selectedPdfSignedUrl = null;
   }
 });
 
-function fileToBase64(file){
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+async function cleanupPdfUpload(){
+  if(selectedPdfStoragePath){
+    try{ await sb.storage.from('pdf-uploads').remove([selectedPdfStoragePath]); }catch(e){}
+  }
+  selectedPdfFile = null;
+  selectedPdfPageCount = null;
+  selectedPdfStoragePath = null;
+  selectedPdfSignedUrl = null;
 }
 
 function computeTargetCount(charLength, pageCount){
@@ -1517,9 +1522,8 @@ async function generate(){
   try{
     let requestBody;
     if(selectedPdfFile){
-      const base64 = await fileToBase64(selectedPdfFile);
       requestBody = {
-        pdfBase64: base64,
+        pdfUrl: selectedPdfSignedUrl,
         targetCount: computeTargetCount(null, selectedPdfPageCount),
         semesterLabel: SEMESTERS[currentSemester],
         deckName: currentDeck.name
@@ -1556,8 +1560,7 @@ async function generate(){
     cards = [...newCards, ...cards];
     notesEl.value = '';
     document.getElementById('charCount').textContent = '0 tegn';
-    selectedPdfFile = null;
-    selectedPdfPageCount = null;
+    await cleanupPdfUpload();
     render();
     showStatus('Tilføjede ' + newCards.length + ' nye kort til sættet.');
   }catch(e){
@@ -1601,23 +1604,46 @@ async function handleFile(ev){
     if(name.endsWith('.apkg')){
       rows = await parseApkg(file);
     }else if(name.endsWith('.pdf')){
-      const maxBytes = 4 * 1024 * 1024;
+      const maxBytes = 25 * 1024 * 1024;
       if(file.size > maxBytes){
-        showError('PDF\'en er for stor (' + Math.round(file.size / 1024 / 1024) + ' MB). Maks ca. 4 MB — prøv at dele den op eller eksportere et mindre udsnit.');
+        showError('PDF\'en er for stor (' + Math.round(file.size / 1024 / 1024) + ' MB). Claude kan maks læse PDF\'er op til ca. 25 MB — prøv at dele den op eller komprimere den.');
         ev.target.value = '';
         return;
       }
       let pageCount = null;
       try{ pageCount = await getPdfPageCount(file); }catch(e){}
+      if(pageCount && pageCount > 100){
+        showError('PDF\'en har ' + pageCount + ' sider. Claude kan maks læse 100 sider ad gangen — prøv at dele den op i mindre dele.');
+        ev.target.value = '';
+        return;
+      }
 
-      selectedPdfFile = file;
-      selectedPdfPageCount = pageCount;
-      const notesEl = document.getElementById('notes');
-      notesEl.value = '';
-      document.getElementById('charCount').textContent = '0 tegn';
-      const estCards = computeTargetCount(null, pageCount);
-      showStatus('PDF valgt: ' + escapeHtml(file.name) + (pageCount ? ' (' + pageCount + ' sider)' : '') +
-        '. Der oprettes ca. ' + estCards + ' kort ud fra hele dokumentet. Klik "Generér flashcards" for at komme i gang.');
+      showStatus('Uploader PDF...');
+      try{
+        const safeName = file.name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+        const path = currentUser.id + '/' + Date.now() + '_' + safeName;
+        const { error: uploadError } = await sb.storage.from('pdf-uploads').upload(path, file, {
+          contentType: 'application/pdf', upsert: true
+        });
+        if(uploadError) throw uploadError;
+
+        const { data: signedData, error: signError } = await sb.storage.from('pdf-uploads').createSignedUrl(path, 600);
+        if(signError) throw signError;
+
+        selectedPdfFile = file;
+        selectedPdfPageCount = pageCount;
+        selectedPdfStoragePath = path;
+        selectedPdfSignedUrl = signedData.signedUrl;
+
+        const notesEl = document.getElementById('notes');
+        notesEl.value = '';
+        document.getElementById('charCount').textContent = '0 tegn';
+        const estCards = computeTargetCount(null, pageCount);
+        showStatus('PDF valgt: ' + escapeHtml(file.name) + (pageCount ? ' (' + pageCount + ' sider)' : '') +
+          '. Der oprettes ca. ' + estCards + ' kort ud fra hele dokumentet. Klik "Generér flashcards" for at komme i gang.');
+      }catch(e){
+        showError('Kunne ikke uploade PDF\'en: ' + (e.message || 'ukendt fejl'));
+      }
       ev.target.value = '';
       return;
     }else{
