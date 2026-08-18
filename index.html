@@ -132,14 +132,14 @@
   .tab-btn.active{opacity:1;color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
   .tab-btn:hover{opacity:0.85;}
 
-  .hub-menu-grid{display:grid;grid-template-columns:1fr;gap:14px;margin:8px 0 4px;}
-  .hub-menu-card{background:var(--card);border:1px solid var(--line);border-radius:14px;
-    padding:26px 20px;cursor:pointer;text-align:center;transition:border-color 0.15s ease, box-shadow 0.15s ease;}
+  .hub-menu-grid{display:flex;gap:8px;margin:8px 0 4px;}
+  .hub-menu-card{flex:1;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:16px 6px;cursor:pointer;text-align:center;transition:border-color 0.15s ease, box-shadow 0.15s ease;}
   .hub-menu-card:hover{border-color:var(--accent);box-shadow:0 3px 10px rgba(15,110,86,0.10);}
-  .hub-menu-icon{width:52px;height:52px;border-radius:50%;background:var(--accent-light);
-    display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:24px;color:var(--accent);}
-  .hub-menu-card .name{font-size:16px;font-weight:600;margin-bottom:4px;}
-  .hub-menu-card .place{font-size:13px;opacity:0.6;}
+  .hub-menu-icon{width:42px;height:42px;border-radius:50%;background:var(--accent-light);
+    display:flex;align-items:center;justify-content:center;margin:0 auto 10px;}
+  .hub-menu-card .name{font-size:12.5px;font-weight:600;margin-bottom:3px;line-height:1.25;}
+  .hub-menu-card .place{font-size:10.5px;opacity:0.6;line-height:1.3;}
 </style>
 </head>
 <body>
@@ -262,38 +262,37 @@
       <div class="hub-menu-grid">
         <div class="hub-menu-card" onclick="switchHubTab('flashcards')">
           <div class="hub-menu-icon">
-            <svg viewBox="0 0 48 48" width="30" height="30">
-              <rect x="15" y="6" width="26" height="34" rx="4" fill="#E86B5C" transform="rotate(9 28 23)"/>
-              <rect x="10" y="7" width="26" height="34" rx="4" fill="#F2B84B" transform="rotate(-5 23 24)"/>
-              <rect x="8" y="9" width="28" height="34" rx="4" fill="#3E6FA8"/>
-              <rect x="14" y="19" width="16" height="3" rx="1.5" fill="#F5F1E8"/>
-              <rect x="14" y="26" width="16" height="3" rx="1.5" fill="#F5F1E8"/>
+            <svg viewBox="0 0 24 24" width="22" height="22">
+              <rect x="5" y="3" width="16" height="12" rx="2" fill="#F2B84B"/>
+              <rect x="3" y="7" width="16" height="12" rx="2" fill="#3E6FA8"/>
+              <rect x="6" y="12" width="10" height="2" rx="1" fill="#F5F1E8"/>
+              <rect x="6" y="16" width="10" height="2" rx="1" fill="#F5F1E8"/>
             </svg>
           </div>
           <div class="name">Flashcards</div>
-          <div class="place">Øv dig med officielle og brugerdefinerede sæt</div>
+          <div class="place">Øv dig med sæt</div>
         </div>
         <div class="hub-menu-card" onclick="switchHubTab('litteratur')">
           <div class="hub-menu-icon">
-            <svg viewBox="0 0 48 48" width="30" height="30">
-              <rect x="6" y="30" width="36" height="7" rx="1.5" fill="#4C9A6A"/>
-              <rect x="7" y="23" width="34" height="7" rx="1.5" fill="#3E6FA8"/>
-              <rect x="9" y="16" width="30" height="7" rx="1.5" fill="#E8574A"/>
-              <rect x="11" y="9" width="26" height="7" rx="1.5" fill="#F2B84B"/>
+            <svg viewBox="0 0 24 24" width="22" height="22">
+              <rect x="2" y="17" width="20" height="4" rx="1" fill="#4C9A6A"/>
+              <rect x="3" y="12" width="18" height="4" rx="1" fill="#3E6FA8"/>
+              <rect x="4" y="7" width="16" height="4" rx="1" fill="#E8574A"/>
+              <rect x="5" y="2" width="14" height="4" rx="1" fill="#F2B84B"/>
             </svg>
           </div>
           <div class="name">Litteratur</div>
-          <div class="place">Find pensum og anbefalet læsning</div>
+          <div class="place">Find pensum</div>
         </div>
         <div class="hub-menu-card" onclick="switchHubTab('marked')">
           <div class="hub-menu-icon">
-            <svg viewBox="0 0 48 48" width="30" height="30">
-              <path d="M6 24 L24 6 H38 A4 4 0 0 1 42 10 V24 L24 42 A4 4 0 0 1 18 42 L6 30 A4 4 0 0 1 6 24 Z" fill="#F2B84B"/>
-              <circle cx="32" cy="16" r="4" fill="#FFFDF7"/>
+            <svg viewBox="0 0 24 24" width="22" height="22">
+              <polygon points="2,10 10,2 22,2 22,14 14,22 2,14" fill="#F2B84B"/>
+              <circle cx="17" cy="7" r="2" fill="#FFFDF7"/>
             </svg>
           </div>
           <div class="name">Køb og salg</div>
-          <div class="place">Køb og sælg brugte bøger og udstyr</div>
+          <div class="place">Bøger og udstyr</div>
         </div>
       </div>
     </div>
