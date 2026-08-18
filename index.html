@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cortex</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.44.0/iconfont/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --paper:#F5F1E8; --paper-dark:#1B1B18;
@@ -22,9 +25,9 @@
       --warn:var(--warn-dark); --warn-light:var(--warn-light-dark); }
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:-apple-system,Segoe UI,sans-serif;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Plus Jakarta Sans',-apple-system,Segoe UI,sans-serif;}
   .wrap{max-width:640px;margin:0 auto;padding:32px 20px 60px;}
-  h1{font-family:Georgia,'Times New Roman',serif;font-weight:400;font-size:28px;
+  h1{font-family:'Fredoka',sans-serif;font-weight:600;font-size:28px;
     margin:0 0 4px;letter-spacing:-0.01em;}
   .sub{color:var(--ink);opacity:0.6;font-size:14px;margin:0 0 24px;}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;
@@ -43,7 +46,7 @@
   .stats{display:flex;gap:20px;margin-bottom:18px;}
   .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;
     padding:12px 16px;flex:1;text-align:center;}
-  .stat .n{font-size:22px;font-family:Georgia,serif;}
+  .stat .n{font-size:22px;font-family:'Fredoka',sans-serif;font-weight:600;}
   .stat .l{font-size:12px;opacity:0.6;margin-top:2px;}
   .deck{display:grid;grid-template-columns:1fr;gap:14px;}
   .card{perspective:1000px;height:150px;cursor:pointer;}
@@ -123,7 +126,7 @@
   .feedback-box ul li{margin-bottom:2px;}
 
   .chart-segment{transition: stroke-dashoffset 1s cubic-bezier(.25,.8,.3,1);}
-  .chart-center-n{font-family:Georgia,serif;font-size:28px;fill:var(--ink);}
+  .chart-center-n{font-family:'Fredoka',sans-serif;font-weight:600;font-size:28px;fill:var(--ink);}
   .chart-center-l{font-size:10px;fill:var(--ink);opacity:0.55;letter-spacing:0.04em;}
 
 
@@ -139,9 +142,16 @@
   .sem-group{margin-bottom:24px;}
   .sem-group h3{font-size:14px;font-weight:500;opacity:0.6;margin:0 0 10px;text-transform:uppercase;letter-spacing:0.04em;}
   .sem-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
-  .sem-btn{background:var(--card);border:1px solid var(--line);border-radius:10px;
-    padding:16px 8px;text-align:center;cursor:pointer;font-size:14px;color:var(--ink);}
-  .sem-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .sem-btn{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:16px 6px 12px;text-align:center;cursor:pointer;font-family:inherit;color:var(--ink);
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+    transition:transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;}
+  .sem-btn:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(0,0,0,0.10);border-color:transparent;}
+  .sem-num{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:'Fredoka',sans-serif;font-weight:600;font-size:16px;color:#fff;}
+  .sem-btn-bachelor .sem-num{background:linear-gradient(135deg,#0F6E56,#4FCBA8);}
+  .sem-btn-kandidat .sem-num{background:linear-gradient(135deg,#C08A2E,#EFC067);}
+  .sem-label{font-size:11.5px;opacity:0.65;}
 
   .browse-card{background:var(--card);border:1px solid var(--line);border-radius:12px;
     padding:16px 90px 16px 18px;cursor:pointer;position:relative;margin-bottom:12px;}
@@ -684,10 +694,12 @@ let currentDeck = null;
 function buildSemesterGrids(){
   const bGrid = document.getElementById('semGridBachelor');
   const kGrid = document.getElementById('semGridKandidat');
-  bGrid.innerHTML = ['b1','b2','b3','b4','b5','b6'].map(id =>
-    '<button class="sem-btn" onclick="selectSemester(\'' + id + '\')">' + SEMESTERS[id] + '</button>').join('');
-  kGrid.innerHTML = ['k1','k2','k3','k4','k5','k6'].map(id =>
-    '<button class="sem-btn" onclick="selectSemester(\'' + id + '\')">' + SEMESTERS[id] + '</button>').join('');
+  bGrid.innerHTML = ['b1','b2','b3','b4','b5','b6'].map((id, i) =>
+    '<button class="sem-btn sem-btn-bachelor" onclick="selectSemester(\'' + id + '\')">' +
+    '<span class="sem-num">' + (i + 1) + '</span><span class="sem-label">semester</span></button>').join('');
+  kGrid.innerHTML = ['k1','k2','k3','k4','k5','k6'].map((id, i) =>
+    '<button class="sem-btn sem-btn-kandidat" onclick="selectSemester(\'' + id + '\')">' +
+    '<span class="sem-num">' + (i + 1) + '</span><span class="sem-label">semester</span></button>').join('');
 }
 
 const ALL_VIEWS = ['home','auth','onboarding','profile','semester','hub','browse','app','review','review-results','about','contact','privacy','terms'];
@@ -882,11 +894,23 @@ async function openDeck(deck){
   showView('app');
 }
 
+const GREETINGS = [
+  'Hej', 'Hola', 'Ciao', 'Hallo', 'Bonjour', 'Olá', 'Merhaba', 'Jambo',
+  'Aloha', 'Kia ora', 'Salut', 'Moin', 'Hei', 'Namaste', 'Sawubona',
+  'Habari', 'Szia', 'Ahoj', 'Xin chào', 'Talofa'
+];
+
+function randomGreeting(){
+  return GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+}
+
 function renderAuthBar(){
   const bar = document.getElementById('authBar');
   if(!bar) return;
   if(currentUser){
-    bar.innerHTML = 'Logget ind som ' + escapeHtml(currentUser.email) +
+    const fullName = (currentProfile && currentProfile.full_name) ? currentProfile.full_name : currentUser.email;
+    const firstName = fullName.split(' ')[0];
+    bar.innerHTML = randomGreeting() + ', ' + escapeHtml(firstName) + '!' +
       ' &middot; <a href="#" onclick="openProfileView();return false;" style="color:var(--accent);">Min profil</a>' +
       ' &middot; <a href="#" onclick="logOut();return false;" style="color:var(--accent);">Log ud</a>';
   }else{
