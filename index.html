@@ -896,6 +896,20 @@ async function openDeck(deck){
   currentSemester = deck.semester;
   localStorage.setItem('cortex_current_deck', JSON.stringify(deck));
 
+  // Clear any leftover PDF selection from a previous deck/session — a signed upload URL
+  // from another deck (or one that's since expired) must never carry over silently.
+  if(selectedPdfStoragePath){
+    try{ await sb.storage.from('pdf-uploads').remove([selectedPdfStoragePath]); }catch(e){}
+  }
+  selectedPdfFile = null;
+  selectedPdfPageCount = null;
+  selectedPdfStoragePath = null;
+  selectedPdfSignedUrl = null;
+  const notesElReset = document.getElementById('notes');
+  if(notesElReset) notesElReset.value = '';
+  const charCountReset = document.getElementById('charCount');
+  if(charCountReset) charCountReset.textContent = '0 tegn';
+
   const group = deck.semester.startsWith('b') ? 'Bachelor' : 'Kandidat';
   document.getElementById('appTitle').textContent = deck.type === 'official' ? capitalize(deck.level) : deck.name;
   document.getElementById('appSub').textContent = 'Medicin, KU · ' + group + ' · ' + SEMESTERS[deck.semester];
@@ -1514,6 +1528,10 @@ async function generate(){
   if(!isConfigured()){ showError(configWarning()); return; }
   if(!currentUser){ showError(requireLoginMessage()); return; }
   if(!notes && !selectedPdfFile){ showError('Indsæt noter, eller vælg en PDF via "Importér fil" først.'); return; }
+  if(selectedPdfFile && !selectedPdfSignedUrl){
+    showError('PDF-uploaden er ikke længere gyldig. Vælg filen igen via "Importér fil".');
+    return;
+  }
 
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
