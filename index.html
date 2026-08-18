@@ -122,6 +122,10 @@
   .feedback-box ul{margin:0;padding-left:18px;font-size:14px;line-height:1.65;color:var(--ink);}
   .feedback-box ul li{margin-bottom:2px;}
 
+  .chart-segment{transition: stroke-dashoffset 1s cubic-bezier(.25,.8,.3,1);}
+  .chart-center-n{font-family:Georgia,serif;font-size:28px;fill:var(--ink);}
+  .chart-center-l{font-size:10px;fill:var(--ink);opacity:0.55;letter-spacing:0.04em;}
+
 
   .program-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:20px;}
   .program-card{background:var(--card);border:1px solid var(--line);border-radius:12px;
@@ -509,14 +513,14 @@
   <!-- VIEW: REVIEW RESULTS -->
   <div id="view-review-results" style="display:none;">
     <div style="max-width:420px;margin:60px auto 0;text-align:left;">
-      <div class="auth-icon" style="margin:0 auto 18px;"><i class="ti ti-confetti"></i></div>
+      <div id="resultsChart" style="width:150px;height:150px;margin:0 auto 4px;"></div>
       <h1 style="text-align:center;">Godt gået!</h1>
       <p class="sub" id="resultsSummary" style="text-align:center;"></p>
 
       <div class="stats" style="margin-top:20px;">
-        <div class="stat"><div class="n" id="resultHard">0</div><div class="l">svært</div></div>
-        <div class="stat"><div class="n" id="resultMedium">0</div><div class="l">mellem</div></div>
-        <div class="stat"><div class="n" id="resultEasy">0</div><div class="l">nemt</div></div>
+        <div class="stat"><div class="n" id="resultHard">0</div><div class="l"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#B5493D;margin-right:4px;"></span>svært</div></div>
+        <div class="stat"><div class="n" id="resultMedium">0</div><div class="l"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#C08A2E;margin-right:4px;"></span>mellem</div></div>
+        <div class="stat"><div class="n" id="resultEasy">0</div><div class="l"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#3E8F5F;margin-right:4px;"></span>nemt</div></div>
       </div>
 
       <button id="feedbackBtn" class="ghost" style="width:100%;margin-top:18px;" onclick="requestFeedback()">
@@ -1657,15 +1661,74 @@ function finishReview(){
   const s = elapsed % 60;
   document.getElementById('resultsSummary').textContent =
     reviewQueue.length + ' kort gennemgået på ' + m + ' min ' + (s < 10 ? '0' : '') + s + ' sek.';
-  document.getElementById('resultHard').textContent = reviewStats.hard;
-  document.getElementById('resultMedium').textContent = reviewStats.medium;
-  document.getElementById('resultEasy').textContent = reviewStats.easy;
+  animateNumber(document.getElementById('resultHard'), reviewStats.hard);
+  animateNumber(document.getElementById('resultMedium'), reviewStats.medium);
+  animateNumber(document.getElementById('resultEasy'), reviewStats.easy);
   document.getElementById('feedbackBox').style.display = 'none';
   document.getElementById('feedbackErrorBox').innerHTML = '';
   document.getElementById('feedbackBtn').style.display = 'block';
   document.getElementById('feedbackBtn').disabled = false;
   document.getElementById('feedbackBtn').innerHTML = '<i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>AI Feedback';
+  renderResultsChart(reviewStats);
   showView('review-results');
+}
+
+function animateNumber(el, target, duration){
+  duration = duration || 700;
+  const start = performance.now();
+  function step(now){
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(target * eased);
+    if(t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function renderResultsChart(stats){
+  const container = document.getElementById('resultsChart');
+  const total = stats.hard + stats.medium + stats.easy;
+  const r = 52, cx = 75, cy = 75, stroke = 16;
+  const C = 2 * Math.PI * r;
+
+  const segments = [
+    { value: stats.hard, color: '#B5493D' },
+    { value: stats.medium, color: '#C08A2E' },
+    { value: stats.easy, color: '#3E8F5F' }
+  ];
+
+  let cumulative = 0;
+  let circles = '';
+  segments.forEach(seg => {
+    if(total === 0 || seg.value === 0) return;
+    const frac = seg.value / total;
+    const arcLen = frac * C;
+    const rotation = -90 + (cumulative / total) * 360;
+    circles += '<circle class="chart-segment" cx="' + cx + '" cy="' + cy + '" r="' + r + '" ' +
+      'fill="none" stroke="' + seg.color + '" stroke-width="' + stroke + '" stroke-linecap="round" ' +
+      'stroke-dasharray="' + arcLen + ' ' + (C - arcLen) + '" stroke-dashoffset="' + arcLen + '" ' +
+      'transform="rotate(' + rotation + ' ' + cx + ' ' + cy + ')"></circle>';
+    cumulative += seg.value;
+  });
+
+  const bg = total === 0
+    ? '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="var(--line)" stroke-width="' + stroke + '"></circle>'
+    : '';
+
+  container.innerHTML =
+    '<svg viewBox="0 0 150 150" width="150" height="150">' +
+      bg +
+      circles +
+      '<text x="75" y="72" text-anchor="middle" class="chart-center-n">' + total + '</text>' +
+      '<text x="75" y="90" text-anchor="middle" class="chart-center-l">KORT</text>' +
+    '</svg>';
+
+  // Force layout, then release dashoffset to 0 so segments animate drawing in
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      container.querySelectorAll('.chart-segment').forEach(c => c.setAttribute('stroke-dashoffset', '0'));
+    });
+  });
 }
 
 async function requestFeedback(){
