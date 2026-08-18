@@ -486,7 +486,7 @@
         <div class="row">
           <span class="count" id="charCount">0 tegn</span>
           <div style="display:flex;gap:8px;">
-            <input type="file" id="fileInput" accept=".txt,.md,.csv,.apkg" style="display:none" onchange="handleFile(event)">
+            <input type="file" id="fileInput" accept=".txt,.md,.csv,.apkg,.pdf" style="display:none" onchange="handleFile(event)">
             <button class="ghost" onclick="document.getElementById('fileInput').click()">
               <i class="ti ti-upload" style="font-size:15px;vertical-align:-2px;margin-right:4px;"></i>Importér fil
             </button>
@@ -638,6 +638,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 // ---- SUPABASE CONFIG: replace these two lines with your own project's values ----
@@ -1555,6 +1556,23 @@ async function handleFile(ev){
     let rows = null;
     if(name.endsWith('.apkg')){
       rows = await parseApkg(file);
+    }else if(name.endsWith('.pdf')){
+      let text = await parsePdfText(file);
+      if(!text.trim()){
+        showError('Kunne ikke finde nogen tekst i PDF\'en (er den scannet som billeder?).');
+        ev.target.value = '';
+        return;
+      }
+      let truncated = false;
+      if(text.length > 20000){ text = text.slice(0, 20000); truncated = true; }
+      const notesEl = document.getElementById('notes');
+      notesEl.value = text;
+      document.getElementById('charCount').textContent = text.length + ' tegn';
+      showStatus('Tekst fra PDF\'en er sat ind i tekstfeltet.' +
+        (truncated ? ' Den var lang, så kun de første ~20.000 tegn er taget med.' : '') +
+        ' Klik "Generér flashcards" for at lave kort ud fra det.');
+      ev.target.value = '';
+      return;
     }else{
       const text = await file.text();
       const lines = text.split(/\r?\n/).filter(l => l.trim() && !l.startsWith('#'));
@@ -1590,6 +1608,28 @@ async function handleFile(ev){
   }finally{
     ev.target.value = '';
   }
+}
+
+let pdfWorkerConfigured = false;
+
+async function parsePdfText(file){
+  if(typeof pdfjsLib === 'undefined'){
+    throw new Error('PDF-læser kunne ikke indlæses. Prøv at genindlæse siden.');
+  }
+  if(!pdfWorkerConfigured){
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfWorkerConfigured = true;
+  }
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const maxPages = Math.min(pdf.numPages, 60);
+  let text = '';
+  for(let i = 1; i <= maxPages; i++){
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(item => item.str).join(' ') + '\n\n';
+  }
+  return text.trim();
 }
 
 async function parseApkg(file){
