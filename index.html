@@ -495,10 +495,10 @@
 
   <!-- VIEW: REVIEW RESULTS -->
   <div id="view-review-results" style="display:none;">
-    <div style="max-width:420px;margin:60px auto 0;text-align:center;">
-      <div class="auth-icon"><i class="ti ti-confetti"></i></div>
-      <h1>Godt gået!</h1>
-      <p class="sub" id="resultsSummary"></p>
+    <div style="max-width:420px;margin:60px auto 0;text-align:left;">
+      <div class="auth-icon" style="margin:0 auto 18px;"><i class="ti ti-confetti"></i></div>
+      <h1 style="text-align:center;">Godt gået!</h1>
+      <p class="sub" id="resultsSummary" style="text-align:center;"></p>
 
       <div class="stats" style="margin-top:20px;">
         <div class="stat"><div class="n" id="resultHard">0</div><div class="l">svært</div></div>
@@ -506,7 +506,16 @@
         <div class="stat"><div class="n" id="resultEasy">0</div><div class="l">nemt</div></div>
       </div>
 
-      <div style="display:flex;gap:10px;margin-top:24px;">
+      <button id="feedbackBtn" class="ghost" style="width:100%;margin-top:18px;" onclick="requestFeedback()">
+        <i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>Få AI-feedback på din session
+      </button>
+      <div id="feedbackErrorBox"></div>
+      <div id="feedbackBox" style="display:none;" class="panel">
+        <div class="tag" style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:8px;">Din feedback</div>
+        <div id="feedbackText" style="font-size:14px;line-height:1.6;"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:20px;">
         <button class="ghost" style="flex:1;" onclick="showView('app')">Til sættet</button>
         <button style="flex:1;" onclick="startReview()">Øv igen</button>
       </div>
@@ -1542,6 +1551,7 @@ let reviewQueue = [];
 let reviewIndex = 0;
 let reviewFlipped = false;
 let reviewStats = { hard: 0, medium: 0, easy: 0 };
+let reviewSessionLog = [];
 let reviewStartTime = null;
 let reviewTimerInterval = null;
 
@@ -1559,6 +1569,7 @@ function startReview(){
   reviewQueue = shuffleArray(cards);
   reviewIndex = 0;
   reviewStats = { hard: 0, medium: 0, easy: 0 };
+  reviewSessionLog = [];
   reviewStartTime = Date.now();
   showView('review');
   showReviewCard();
@@ -1601,6 +1612,7 @@ function rateCard(rating){
   if(!reviewFlipped) return;
   reviewStats[rating]++;
   const c = reviewQueue[reviewIndex];
+  reviewSessionLog.push({ question: c.question, answer: c.answer, rating: rating });
   saveCardRating(currentDeck.id, c.id, rating);
 
   reviewIndex++;
@@ -1635,7 +1647,47 @@ function finishReview(){
   document.getElementById('resultHard').textContent = reviewStats.hard;
   document.getElementById('resultMedium').textContent = reviewStats.medium;
   document.getElementById('resultEasy').textContent = reviewStats.easy;
+  document.getElementById('feedbackBox').style.display = 'none';
+  document.getElementById('feedbackErrorBox').innerHTML = '';
+  document.getElementById('feedbackBtn').style.display = 'block';
+  document.getElementById('feedbackBtn').disabled = false;
+  document.getElementById('feedbackBtn').innerHTML = '<i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>Få AI-feedback på din session';
   showView('review-results');
+}
+
+async function requestFeedback(){
+  const errBox = document.getElementById('feedbackErrorBox');
+  errBox.innerHTML = '';
+  if(!isConfigured()){ errBox.innerHTML = configWarning(); return; }
+  if(!currentUser){ errBox.innerHTML = requireLoginMessage(); return; }
+  if(reviewSessionLog.length === 0){ errBox.innerHTML = '<div class="error">Ingen sessionsdata at give feedback på.</div>'; return; }
+
+  const btn = document.getElementById('feedbackBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>Analyserer din session...';
+
+  try{
+    const response = await fetch('/.netlify/functions/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        session: reviewSessionLog,
+        semesterLabel: SEMESTERS[currentDeck.semester],
+        deckName: currentDeck.name
+      })
+    });
+    const data = await response.json();
+    if(!response.ok){
+      throw new Error((data && data.error) ? data.error : ('HTTP ' + response.status));
+    }
+    document.getElementById('feedbackText').textContent = data.feedback;
+    document.getElementById('feedbackBox').style.display = 'block';
+    btn.style.display = 'none';
+  }catch(e){
+    errBox.innerHTML = '<div class="error">Kunne ikke hente feedback: ' + (e.message || 'ukendt fejl') + '</div>';
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-sparkles" style="font-size:15px;vertical-align:-2px;margin-right:6px;"></i>Få AI-feedback på din session';
+  }
 }
 
 document.addEventListener('keydown', function(e){
