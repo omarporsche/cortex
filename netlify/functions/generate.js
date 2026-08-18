@@ -22,7 +22,7 @@ exports.handler = async function (event) {
   }
 
   const notes = (payload.notes || '').toString();
-  const pdfBase64 = (payload.pdfBase64 || '').toString();
+  const pdfUrl = (payload.pdfUrl || '').toString();
   const semesterLabel = (payload.semesterLabel || '').toString();
   const deckName = (payload.deckName || '').toString();
 
@@ -31,16 +31,32 @@ exports.handler = async function (event) {
   if (!Number.isFinite(targetCount)) targetCount = 10;
   targetCount = Math.max(5, Math.min(60, targetCount));
 
-  if (!notes.trim() && !pdfBase64) {
+  if (!notes.trim() && !pdfUrl) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Hverken noter eller PDF modtaget.' }) };
   }
   if (notes.length > 20000) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Noterne er for lange (maks 20.000 tegn).' }) };
   }
-  // Netlify functions have a request-body limit around 6MB; base64 inflates size ~33%,
-  // so keep a safety margin under that.
-  if (pdfBase64 && pdfBase64.length > 6_000_000) {
-    return { statusCode: 413, body: JSON.stringify({ error: 'PDF\'en er for stor til at blive sendt (maks ca. 4 MB).' }) };
+
+  // The PDF itself never passes through the client -> function request body (that has a ~6MB
+  // ceiling on Netlify). Instead the browser uploads it to Supabase Storage and hands us a
+  // short-lived signed URL, which we fetch server-side. Claude's own ceiling is ~32MB / 100 pages.
+  let pdfBase64 = '';
+  if (pdfUrl) {
+    let pdfResp;
+    try {
+      pdfResp = await fetch(pdfUrl);
+    } catch (e) {
+      return { statusCode: 502, body: JSON.stringify({ error: 'Kunne ikke hente PDF\'en fra storage.' }) };
+    }
+    if (!pdfResp.ok) {
+      return { statusCode: 502, body: JSON.stringify({ error: 'Kunne ikke hente PDF\'en fra storage (status ' + pdfResp.status + ').' }) };
+    }
+    const arrayBuf = await pdfResp.arrayBuffer();
+    if (arrayBuf.byteLength > 30_000_000) {
+      return { statusCode: 413, body: JSON.stringify({ error: 'PDF\'en er for stor til Claude (maks ca. 30 MB / 100 sider).' }) };
+    }
+    pdfBase64 = Buffer.from(arrayBuf).toString('base64');
   }
 
   const instructions = 'Du hjaelper en medicinstuderende paa ' + semesterLabel +
