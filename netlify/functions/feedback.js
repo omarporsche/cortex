@@ -42,12 +42,13 @@ exports.handler = async function (event) {
   const prompt = 'En medicinstuderende paa ' + semesterLabel + ' har lige gennemgaaet flashcard-saettet "' + deckName +
     '" og selv vurderet hvert kort som svaert, mellem eller nemt.\n\n' +
     'Her er kortene med deres vurdering:\n' + lines + '\n\n' +
-    'Giv kort, konkret feedback paa dansk (maks ca. 150 ord):\n' +
-    '- Hvilke emner/begreber ser ud til at sidde godt fast (dem vurderet nemt/mellem)?\n' +
-    '- Hvilke emner boer de repetere snarest (dem vurderet svaert)?\n' +
-    'Vaer specifik om de faktiske emner i sporgsmaalene, ikke generisk opmuntring. ' +
-    'Skriv i en venlig, faglig tone, som en studiekammerat der giver et hurtigt overblik. ' +
-    'Svar KUN med selve feedback-teksten, ingen indledning som "Her er din feedback".';
+    'Analysér mønstret og svar KUN med et JSON-objekt, ingen anden tekst, ingen markdown-fences:\n' +
+    '{"strengths": ["kort punkt om et emne de har styr på", "..."], "review": ["kort punkt om et emne de bør laese op paa", "..."]}\n\n' +
+    'Regler:\n' +
+    '- Hvert punkt skal vaere kort (maks en halv saetning) og navngive det konkrete emne/begreb fra spørgsmålene, ikke generisk opmuntring.\n' +
+    '- "strengths" er baseret paa kort vurderet nemt/mellem, "review" er baseret paa kort vurderet svaert.\n' +
+    '- Maks 5 punkter i hver kategori. Hvis en kategori er tom (fx ingen svaere kort), returnér et tomt array for den.\n' +
+    '- Skriv paa dansk.';
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -77,10 +78,25 @@ exports.handler = async function (event) {
       return { statusCode: 502, body: JSON.stringify({ error: 'Uventet svar fra AI-tjenesten.' }) };
     }
 
+    let raw = textBlock.text.trim();
+    if (raw.indexOf('```') === 0) {
+      raw = raw.replace(/^```json?/, '').replace(/```$/, '').trim();
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (e) {
+      return { statusCode: 502, body: JSON.stringify({ error: 'Kunne ikke laese AI-svaret som JSON.' }) };
+    }
+
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ feedback: textBlock.text.trim() })
+      body: JSON.stringify({
+        strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+        review: Array.isArray(parsed.review) ? parsed.review : []
+      })
     };
   } catch (e) {
     return { statusCode: 500, body: JSON.stringify({ error: e.message || 'Serverfejl' }) };
