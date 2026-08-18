@@ -1,5 +1,5 @@
 // This function runs on Netlify's server, not in the visitor's browser.
-// The API key lives only here, as an environment variable â€” visitors never see it.
+// The API key lives only here, as an environment variable — visitors never see it.
 
 exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') {
@@ -10,7 +10,7 @@ exports.handler = async function (event) {
   if (!apiKey) {
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Serveren mangler en API-nÃ¸gle (ANTHROPIC_API_KEY er ikke sat i Netlify).' })
+      body: JSON.stringify({ error: 'Serveren mangler en API-nøgle (ANTHROPIC_API_KEY er ikke sat i Netlify).' })
     };
   }
 
@@ -18,27 +18,53 @@ exports.handler = async function (event) {
   try {
     payload = JSON.parse(event.body || '{}');
   } catch (e) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Ugyldig forespÃ¸rgsel.' }) };
+    return { statusCode: 400, body: JSON.stringify({ error: 'Ugyldig forespørgsel.' }) };
   }
 
   const notes = (payload.notes || '').toString();
+  const pdfBase64 = (payload.pdfBase64 || '').toString();
   const semesterLabel = (payload.semesterLabel || '').toString();
   const deckName = (payload.deckName || '').toString();
 
-  if (!notes.trim()) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Noter mangler.' }) };
+  // Clamp requested card count to a sane, cost-safe range regardless of what the client sent.
+  let targetCount = parseInt(payload.targetCount, 10);
+  if (!Number.isFinite(targetCount)) targetCount = 10;
+  targetCount = Math.max(5, Math.min(60, targetCount));
+
+  if (!notes.trim() && !pdfBase64) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Hverken noter eller PDF modtaget.' }) };
   }
   if (notes.length > 20000) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Noterne er for lange (maks 20.000 tegn).' }) };
   }
+  // Netlify functions have a request-body limit around 6MB; base64 inflates size ~33%,
+  // so keep a safety margin under that.
+  if (pdfBase64 && pdfBase64.length > 6_000_000) {
+    return { statusCode: 413, body: JSON.stringify({ error: 'PDF\'en er for stor til at blive sendt (maks ca. 4 MB).' }) };
+  }
 
-  const prompt = 'Du hjaelper en medicinstuderende paa ' + semesterLabel +
-    ' med at lave eksamens-flashcards ud fra deres noter. Saettet, kortene tilhoerer, hedder "' + deckName + '".\n\n' +
-    'Laes noterne nedenfor og lav praecis 8 flashcards, der tester de vigtigste, eksamensrelevante fakta og koncepter. ' +
-    'Foretraek spoergsmaal der tester forstaaelse (mekanismer, differentialdiagnoser, "hvorfor") frem for ren udenadslaere, hvor det giver mening.\n\n' +
+  const instructions = 'Du hjaelper en medicinstuderende paa ' + semesterLabel +
+    ' med at lave eksamens-flashcards. Saettet, kortene tilhoerer, hedder "' + deckName + '".\n\n' +
+    (pdfBase64
+      ? 'Laes hele det vedhaengte PDF-dokument (inklusiv figurer, tabeller og diagrammer, ikke kun broedteksten) og '
+      : 'Laes noterne nedenfor og ') +
+    'lav praecis ' + targetCount + ' flashcards, der tilsammen daekker materialet grundigt — fra grundlaeggende ' +
+    'begreber til vigtige detaljer, saa hele det indsatte pensum bliver testet, ikke kun de foerste sider. ' +
+    'Foretraek spoergsmaal der tester forstaaelse (mekanismer, differentialdiagnoser, "hvorfor") frem for ren ' +
+    'udenadslaere, hvor det giver mening.\n\n' +
     'Svar KUN med et JSON array, ingen anden tekst, ingen markdown-fences.\n' +
-    'Hvert element skal se saadan ud: {"question": "...", "answer": "..."}\n\n' +
-    'NOTER:\n' + notes;
+    'Hvert element skal se saadan ud: {"question": "...", "answer": "..."}' +
+    (pdfBase64 ? '' : '\n\nNOTER:\n' + notes);
+
+  const messageContent = pdfBase64
+    ? [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+        { type: 'text', text: instructions }
+      ]
+    : instructions;
+
+  // More cards need more room to answer in — scale the output budget with the request.
+  const maxTokens = Math.min(8000, 800 + targetCount * 150);
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -50,9 +76,9 @@ exports.handler = async function (event) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 4000,
+        max_tokens: maxTokens,
         thinking: { type: 'disabled' },
-        messages: [{ role: 'user', content: prompt }]
+        messages: [{ role: 'user', content: messageContent }]
       })
     });
 
