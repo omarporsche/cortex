@@ -1470,9 +1470,37 @@ async function loadCards(){
   render();
 }
 
+let selectedPdfFile = null;
+let selectedPdfPageCount = null;
+
 document.getElementById('notes').addEventListener('input', (e)=>{
   document.getElementById('charCount').textContent = e.target.value.length + ' tegn';
+  if(e.target.value.trim().length > 0 && selectedPdfFile){
+    selectedPdfFile = null;
+    selectedPdfPageCount = null;
+  }
 });
+
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function computeTargetCount(charLength, pageCount){
+  let count;
+  if(pageCount){
+    count = Math.round(pageCount * 5);
+  }else if(charLength){
+    count = Math.round(charLength / 600);
+  }else{
+    count = 10;
+  }
+  return Math.max(8, Math.min(60, count));
+}
 
 async function generate(){
   const notesEl = document.getElementById('notes');
@@ -1480,21 +1508,35 @@ async function generate(){
   document.getElementById('errorBox').innerHTML = '';
   if(!isConfigured()){ showError(configWarning()); return; }
   if(!currentUser){ showError(requireLoginMessage()); return; }
-  if(!notes){ showError('Indsæt lidt noter først.'); return; }
+  if(!notes && !selectedPdfFile){ showError('Indsæt noter, eller vælg en PDF via "Importér fil" først.'); return; }
 
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
   btn.innerHTML = '<span class="spin"></span>Genererer...';
 
   try{
+    let requestBody;
+    if(selectedPdfFile){
+      const base64 = await fileToBase64(selectedPdfFile);
+      requestBody = {
+        pdfBase64: base64,
+        targetCount: computeTargetCount(null, selectedPdfPageCount),
+        semesterLabel: SEMESTERS[currentSemester],
+        deckName: currentDeck.name
+      };
+    }else{
+      requestBody = {
+        notes: notes,
+        targetCount: computeTargetCount(notes.length, null),
+        semesterLabel: SEMESTERS[currentSemester],
+        deckName: currentDeck.name
+      };
+    }
+
     const response = await fetch('/.netlify/functions/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        notes: notes,
-        semesterLabel: SEMESTERS[currentSemester],
-        deckName: currentDeck.name
-      })
+      body: JSON.stringify(requestBody)
     });
 
     const data = await response.json();
@@ -1514,6 +1556,8 @@ async function generate(){
     cards = [...newCards, ...cards];
     notesEl.value = '';
     document.getElementById('charCount').textContent = '0 tegn';
+    selectedPdfFile = null;
+    selectedPdfPageCount = null;
     render();
     showStatus('Tilføjede ' + newCards.length + ' nye kort til sættet.');
   }catch(e){
@@ -1557,20 +1601,23 @@ async function handleFile(ev){
     if(name.endsWith('.apkg')){
       rows = await parseApkg(file);
     }else if(name.endsWith('.pdf')){
-      let text = await parsePdfText(file);
-      if(!text.trim()){
-        showError('Kunne ikke finde nogen tekst i PDF\'en (er den scannet som billeder?).');
+      const maxBytes = 4 * 1024 * 1024;
+      if(file.size > maxBytes){
+        showError('PDF\'en er for stor (' + Math.round(file.size / 1024 / 1024) + ' MB). Maks ca. 4 MB — prøv at dele den op eller eksportere et mindre udsnit.');
         ev.target.value = '';
         return;
       }
-      let truncated = false;
-      if(text.length > 20000){ text = text.slice(0, 20000); truncated = true; }
+      let pageCount = null;
+      try{ pageCount = await getPdfPageCount(file); }catch(e){}
+
+      selectedPdfFile = file;
+      selectedPdfPageCount = pageCount;
       const notesEl = document.getElementById('notes');
-      notesEl.value = text;
-      document.getElementById('charCount').textContent = text.length + ' tegn';
-      showStatus('Tekst fra PDF\'en er sat ind i tekstfeltet.' +
-        (truncated ? ' Den var lang, så kun de første ~20.000 tegn er taget med.' : '') +
-        ' Klik "Generér flashcards" for at lave kort ud fra det.');
+      notesEl.value = '';
+      document.getElementById('charCount').textContent = '0 tegn';
+      const estCards = computeTargetCount(null, pageCount);
+      showStatus('PDF valgt: ' + escapeHtml(file.name) + (pageCount ? ' (' + pageCount + ' sider)' : '') +
+        '. Der oprettes ca. ' + estCards + ' kort ud fra hele dokumentet. Klik "Generér flashcards" for at komme i gang.');
       ev.target.value = '';
       return;
     }else{
@@ -1612,24 +1659,15 @@ async function handleFile(ev){
 
 let pdfWorkerConfigured = false;
 
-async function parsePdfText(file){
-  if(typeof pdfjsLib === 'undefined'){
-    throw new Error('PDF-læser kunne ikke indlæses. Prøv at genindlæse siden.');
-  }
+async function getPdfPageCount(file){
+  if(typeof pdfjsLib === 'undefined') return null;
   if(!pdfWorkerConfigured){
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     pdfWorkerConfigured = true;
   }
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  const maxPages = Math.min(pdf.numPages, 60);
-  let text = '';
-  for(let i = 1; i <= maxPages; i++){
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    text += content.items.map(item => item.str).join(' ') + '\n\n';
-  }
-  return text.trim();
+  return pdf.numPages;
 }
 
 async function parseApkg(file){
