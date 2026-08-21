@@ -11,7 +11,8 @@
 const SUPABASE_URL = 'https://ygwydvssavgfsxpgxxdd.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlnd3lkdnNzYXZnZnN4cGd4eGRkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NDkxMDYsImV4cCI6MjEwMDIyNTEwNn0.ptSE_nFUhzwvGyudbG08ROlbL4B4dHzpGpAR_pUvrOY';
 
-const BATCH_SIZE = 25;          // cards requested per Claude call
+const BATCH_SIZE = 12;          // cards requested per Claude call — kept small so answers never get cut off
+const CONCURRENCY = 4;          // batches run in parallel (text notes), to cut wall-clock time
 const MAX_BATCHES = 30;         // safety valve against runaway loops, not a real content limit
 const SAFETY_MAX_CARDS = 400;   // guards against a corrupted/malicious request, not a real coverage limit
 
@@ -27,6 +28,7 @@ exports.handler = async function (event) {
   const accessToken = (payload.accessToken || '').toString();
   const notes = (payload.notes || '').toString();
   const pdfUrl = (payload.pdfUrl || '').toString();
+  const pdfPageCount = parseInt(payload.pdfPageCount, 10) || null;
   const semesterLabel = (payload.semesterLabel || '').toString();
   const deckName = (payload.deckName || '').toString();
   const deckId = (payload.deckId || '').toString();
@@ -57,33 +59,56 @@ exports.handler = async function (event) {
       throw new Error('Hverken noter eller PDF modtaget.');
     }
 
-    let allCards = [];
-    let batchNum = 0;
-
-    while (allCards.length < targetCount && batchNum < MAX_BATCHES) {
-      const remaining = targetCount - allCards.length;
-      const batchSize = Math.min(BATCH_SIZE, remaining);
-      const existingQuestions = allCards.map(c => c.question);
-
-      const batchCards = await generateBatch({
-        apiKey, pdfBase64, notes, semesterLabel, deckName, batchSize, existingQuestions
-      });
-
-      batchNum++;
-      if (batchCards.length === 0) break;
-
-      const rows = batchCards.map(c => ({ deck_id: deckId, question: c.question, answer: c.answer }));
-      await supabaseInsert('cards', rows, accessToken);
-
-      allCards = allCards.concat(batchCards);
-      await setJobStatus(jobId, accessToken, { cards_created: allCards.length });
+    // Split the work into batches, and give each batch its own slice of the material to focus
+    // on — this both parallelizes generation (much faster) and reduces overlap between batches,
+    // rather than relying on a single sequential "don't repeat these" instruction.
+    const numBatches = Math.min(MAX_BATCHES, Math.ceil(targetCount / BATCH_SIZE));
+    const batchSizes = [];
+    let remaining = targetCount;
+    for (let i = 0; i < numBatches; i++) {
+      const size = Math.min(BATCH_SIZE, remaining);
+      batchSizes.push(size);
+      remaining -= size;
     }
 
-    if (allCards.length === 0) {
+    const noteChunks = (!pdfBase64 && notes) ? splitTextIntoChunks(notes, numBatches) : null;
+
+    let cardsCreated = 0;
+    const tasks = batchSizes.map((size, i) => async () => {
+      const focusHint = pdfBase64
+        ? buildPdfFocusHint(i, numBatches, pdfPageCount)
+        : '';
+      const batchNotes = noteChunks ? noteChunks[i] : notes;
+
+      let batchCards = [];
+      try {
+        batchCards = await generateBatch({
+          apiKey, pdfBase64, notes: batchNotes, semesterLabel, deckName, batchSize: size, focusHint
+        });
+      } catch (e) {
+        batchCards = []; // one failed batch shouldn't sink the whole job
+      }
+
+      if (batchCards.length > 0) {
+        const rows = batchCards.map(c => ({ deck_id: deckId, question: c.question, answer: c.answer }));
+        try {
+          await supabaseInsert('cards', rows, accessToken);
+          cardsCreated += batchCards.length;
+          await setJobStatus(jobId, accessToken, { cards_created: cardsCreated });
+        } catch (e) { /* keep going even if one insert fails */ }
+      }
+      return batchCards;
+    });
+
+    const effectiveConcurrency = pdfBase64 ? 2 : CONCURRENCY;
+    const results = await runWithConcurrency(tasks, effectiveConcurrency);
+    const totalCreated = results.reduce((sum, r) => sum + r.length, 0);
+
+    if (totalCreated === 0) {
       throw new Error('Kunne ikke generere nogen kort ud fra materialet.');
     }
 
-    await setJobStatus(jobId, accessToken, { status: 'complete', cards_created: allCards.length });
+    await setJobStatus(jobId, accessToken, { status: 'complete', cards_created: totalCreated });
   } catch (e) {
     try {
       await setJobStatus(jobId, accessToken, { status: 'error', error_message: (e.message || 'Ukendt fejl').slice(0, 500) });
@@ -93,20 +118,62 @@ exports.handler = async function (event) {
   return { statusCode: 200, body: '' };
 };
 
-async function generateBatch({ apiKey, pdfBase64, notes, semesterLabel, deckName, batchSize, existingQuestions }) {
-  const avoidText = existingQuestions.length > 0
-    ? '\n\nDisse spoergsmaal er allerede lavet i tidligere omgange for dette saet — lav IKKE de samme eller meget lignende igen:\n' +
-      existingQuestions.slice(-100).map(q => '- ' + q.slice(0, 150)).join('\n')
-    : '';
+async function runWithConcurrency(taskFns, limit) {
+  const results = new Array(taskFns.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < taskFns.length) {
+      const i = nextIndex++;
+      results[i] = await taskFns[i]();
+    }
+  }
+  const workers = Array.from({ length: Math.min(limit, taskFns.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+function splitTextIntoChunks(text, n) {
+  if (n <= 1) return [text];
+  const chunks = [];
+  const chunkLen = Math.ceil(text.length / n);
+  let start = 0;
+  for (let i = 0; i < n; i++) {
+    let end = Math.min(text.length, start + chunkLen);
+    if (end < text.length) {
+      const nextSpace = text.indexOf(' ', end);
+      if (nextSpace !== -1 && nextSpace - end < 200) end = nextSpace;
+    }
+    chunks.push(text.slice(start, end));
+    start = end;
+  }
+  return chunks;
+}
+
+function buildPdfFocusHint(batchIndex, totalBatches, pageCount) {
+  if (!pageCount || totalBatches <= 1) return '';
+  const pagesPerBatch = pageCount / totalBatches;
+  const fromPage = Math.floor(batchIndex * pagesPerBatch) + 1;
+  const toPage = Math.min(pageCount, Math.ceil((batchIndex + 1) * pagesPerBatch));
+  return 'Fokusér primaert (men ikke udelukkende) paa materialet omkring side ' + fromPage + ' til ' + toPage + ' ud af ' + pageCount + ' sider i alt.';
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function generateBatch({ apiKey, pdfBase64, notes, semesterLabel, deckName, batchSize, focusHint }, retriesLeft) {
+  if (retriesLeft === undefined) retriesLeft = 2;
 
   const instructions = 'Du hjaelper en medicinstuderende paa ' + semesterLabel +
     ' med at lave eksamens-flashcards. Saettet, kortene tilhoerer, hedder "' + deckName + '".\n\n' +
     (pdfBase64
-      ? 'Laes hele det vedhaengte PDF-dokument (inklusiv figurer, tabeller og diagrammer, ikke kun broedteksten) og '
-      : 'Laes noterne nedenfor og ') +
-    'lav praecis ' + batchSize + ' NYE flashcards, der daekker materialet grundigt. ' +
+      ? 'Laes det vedhaengte PDF-dokument (inklusiv figurer, tabeller og diagrammer, ikke kun broedteksten). '
+      : 'Laes noterne nedenfor. ') +
+    (focusHint ? focusHint + '\n\n' : '') +
+    'Lav praecis ' + batchSize + ' flashcards, der daekker denne del af materialet grundigt. ' +
+    'Hold svarene KORTE og praecise (1-3 saetninger) — det er vigtigere at naa alle ' + batchSize + ' kort end at give lange svar. ' +
     'Foretraek spoergsmaal der tester forstaaelse (mekanismer, differentialdiagnoser, "hvorfor") frem for ren ' +
-    'udenadslaere, hvor det giver mening.' + avoidText + '\n\n' +
+    'udenadslaere, hvor det giver mening.\n\n' +
     'Svar KUN med et JSON array, ingen anden tekst, ingen markdown-fences.\n' +
     'Hvert element skal se saadan ud: {"question": "...", "answer": "..."}' +
     (pdfBase64 ? '' : '\n\nNOTER:\n' + notes);
@@ -118,7 +185,7 @@ async function generateBatch({ apiKey, pdfBase64, notes, semesterLabel, deckName
       ]
     : instructions;
 
-  const maxTokens = Math.min(8000, 800 + batchSize * 150);
+  const maxTokens = Math.min(8192, 1200 + batchSize * 300);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -136,7 +203,12 @@ async function generateBatch({ apiKey, pdfBase64, notes, semesterLabel, deckName
   });
 
   const data = await response.json();
+
   if (!response.ok) {
+    if (response.status === 429 && retriesLeft > 0) {
+      await sleep(3000 + Math.random() * 3000);
+      return generateBatch({ apiKey, pdfBase64, notes, semesterLabel, deckName, batchSize, focusHint }, retriesLeft - 1);
+    }
     const msg = (data && data.error && data.error.message) ? data.error.message : ('HTTP ' + response.status);
     throw new Error(msg);
   }
@@ -144,16 +216,44 @@ async function generateBatch({ apiKey, pdfBase64, notes, semesterLabel, deckName
   const textBlock = Array.isArray(data.content) ? data.content.find(b => b.type === 'text' && b.text) : null;
   if (!textBlock) throw new Error('Uventet svar fra AI-tjenesten.');
 
+  // If Claude ran out of tokens mid-answer, the JSON will be cut off and unparseable.
+  // Retrying with a smaller batch (fewer cards to fit in the same budget) usually fixes it,
+  // rather than silently losing this whole batch's cards.
+  const wasTruncated = data.stop_reason === 'max_tokens';
+
   let raw = textBlock.text.trim();
   if (raw.indexOf('```') === 0) {
     raw = raw.replace(/^```json?/, '').replace(/```$/, '').trim();
   }
 
+  let cards = parseCardsLoosely(raw);
+
+  if (cards.length === 0 && (wasTruncated || raw.length > 0) && retriesLeft > 0 && batchSize > 3) {
+    const smallerSize = Math.max(3, Math.ceil(batchSize / 2));
+    return generateBatch({ apiKey, pdfBase64, notes, semesterLabel, deckName, batchSize: smallerSize, focusHint }, retriesLeft - 1);
+  }
+
+  return cards;
+}
+
+// Tries a normal JSON.parse first; if the array got cut off mid-way (truncated response),
+// salvages whatever complete {"question":...,"answer":...} objects it can find instead of
+// discarding the whole batch.
+function parseCardsLoosely(raw) {
   try {
     const cards = JSON.parse(raw);
     return Array.isArray(cards) ? cards.filter(c => c && c.question && c.answer) : [];
   } catch (e) {
-    return [];
+    const found = [];
+    const objRegex = /\{\s*"question"\s*:\s*"(?:[^"\\]|\\.)*"\s*,\s*"answer"\s*:\s*"(?:[^"\\]|\\.)*"\s*\}/g;
+    const matches = raw.match(objRegex) || [];
+    for (const m of matches) {
+      try {
+        const obj = JSON.parse(m);
+        if (obj && obj.question && obj.answer) found.push(obj);
+      } catch (e2) { /* skip malformed fragment */ }
+    }
+    return found;
   }
 }
 
