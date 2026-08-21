@@ -1590,6 +1590,7 @@ async function generate(){
     };
     if(selectedPdfFile){
       requestBody.pdfUrl = selectedPdfSignedUrl;
+      requestBody.pdfPageCount = selectedPdfPageCount;
     }else{
       requestBody.notes = notes;
     }
@@ -1611,7 +1612,12 @@ async function generate(){
     if(result.success){
       await cleanupPdfUpload();
       await loadCards();
-      showStatus('Tilføjede ' + result.cardsCreated + ' nye kort til sættet.');
+      if(result.cardsCreated < targetCount * 0.8){
+        showStatus('Tilføjede ' + result.cardsCreated + ' nye kort (ud af ca. ' + targetCount + ' forsøgt). ' +
+          'Nogle dele af materialet kunne ikke omdannes denne gang — prøv evt. at generere igen for at få resten med.');
+      }else{
+        showStatus('Tilføjede ' + result.cardsCreated + ' nye kort til sættet.');
+      }
     }else{
       showError('Noget gik galt: ' + result.error);
     }
