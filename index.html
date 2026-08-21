@@ -1518,7 +1518,32 @@ function computeTargetCount(charLength, pageCount){
   }else{
     count = 10;
   }
-  return Math.max(8, Math.min(60, count));
+  return Math.max(8, count);
+}
+
+function sleep(ms){
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function pollGenerationJob(jobId, targetCount){
+  const btn = document.getElementById('genBtn');
+  const maxAttempts = 200; // ~10 minutes at 3s intervals
+
+  for(let attempt = 0; attempt < maxAttempts; attempt++){
+    await sleep(3000);
+    try{
+      const { data, error } = await sb.from('generation_jobs').select('*').eq('id', jobId).maybeSingle();
+      if(error || !data) continue;
+      if(data.status === 'complete'){
+        return { success: true, cardsCreated: data.cards_created };
+      }
+      if(data.status === 'error'){
+        return { success: false, error: data.error_message || 'ukendt fejl' };
+      }
+      btn.innerHTML = '<span class="spin"></span>Genererer... (' + (data.cards_created || 0) + ' af ca. ' + (data.target_count || targetCount) + ' kort)';
+    }catch(e){}
+  }
+  return { success: false, error: 'Tog for lang tid at svare. Dine kort bliver muligvis stadig lavet i baggrunden — tjek sættet om lidt.' };
 }
 
 async function generate(){
@@ -1535,52 +1560,61 @@ async function generate(){
 
   const btn = document.getElementById('genBtn');
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>Genererer...';
+  btn.innerHTML = '<span class="spin"></span>Starter...';
 
   try{
-    let requestBody;
+    const { data: sessionData } = await sb.auth.getSession();
+    const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+    if(!accessToken) throw new Error('Din session er udløbet. Log ind igen.');
+
+    const targetCount = selectedPdfFile
+      ? computeTargetCount(null, selectedPdfPageCount)
+      : computeTargetCount(notes.length, null);
+
+    const { data: job, error: jobError } = await sb.from('generation_jobs').insert({
+      user_id: currentUser.id,
+      deck_id: currentDeck.id,
+      status: 'pending',
+      target_count: targetCount,
+      cards_created: 0
+    }).select().single();
+    if(jobError) throw jobError;
+
+    const requestBody = {
+      jobId: job.id,
+      accessToken: accessToken,
+      deckId: currentDeck.id,
+      targetCount: targetCount,
+      semesterLabel: SEMESTERS[currentSemester],
+      deckName: currentDeck.name
+    };
     if(selectedPdfFile){
-      requestBody = {
-        pdfUrl: selectedPdfSignedUrl,
-        targetCount: computeTargetCount(null, selectedPdfPageCount),
-        semesterLabel: SEMESTERS[currentSemester],
-        deckName: currentDeck.name
-      };
+      requestBody.pdfUrl = selectedPdfSignedUrl;
     }else{
-      requestBody = {
-        notes: notes,
-        targetCount: computeTargetCount(notes.length, null),
-        semesterLabel: SEMESTERS[currentSemester],
-        deckName: currentDeck.name
-      };
+      requestBody.notes = notes;
     }
 
-    const response = await fetch('/.netlify/functions/generate', {
+    // Fire-and-forget: background functions don't return a usable response.
+    // Polling generation_jobs is how we find out what happened.
+    fetch('/.netlify/functions/generate-background', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody)
-    });
+    }).catch(() => {});
 
-    const data = await response.json();
-    if(!response.ok){
-      throw new Error((data && data.error) ? data.error : ('HTTP ' + response.status));
-    }
-    if(!data || !Array.isArray(data.cards)){
-      throw new Error('Uventet svar fra serveren.');
-    }
-    const parsed = data.cards;
-    const insertRows = parsed.map(c => ({ deck_id: currentDeck.id, question: c.question, answer: c.answer }));
-
-    const { data: inserted, error: insertError } = await sb.from('cards').insert(insertRows).select();
-    if(insertError) throw insertError;
-
-    const newCards = inserted.map(c => ({ id: c.id, question: c.question, answer: c.answer }));
-    cards = [...newCards, ...cards];
     notesEl.value = '';
     document.getElementById('charCount').textContent = '0 tegn';
-    await cleanupPdfUpload();
-    render();
-    showStatus('Tilføjede ' + newCards.length + ' nye kort til sættet.');
+    showStatus('Genererer kort i baggrunden — det kan tage et stykke tid for store dokumenter. Du må gerne blive på siden.');
+
+    const result = await pollGenerationJob(job.id, targetCount);
+
+    if(result.success){
+      await cleanupPdfUpload();
+      await loadCards();
+      showStatus('Tilføjede ' + result.cardsCreated + ' nye kort til sættet.');
+    }else{
+      showError('Noget gik galt: ' + result.error);
+    }
   }catch(e){
     showError('Noget gik galt: ' + friendlyError(e));
   }finally{
