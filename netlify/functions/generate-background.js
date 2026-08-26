@@ -71,9 +71,12 @@ exports.handler = async function (event) {
       remaining -= size;
     }
 
+    console.log('Job ' + jobId + ': ' + numBatches + ' batches, targetCount=' + targetCount + ', pdf=' + !!pdfBase64);
+
     const noteChunks = (!pdfBase64 && notes) ? splitTextIntoChunks(notes, numBatches) : null;
 
     let cardsCreated = 0;
+    let firstBatchError = null;
     const tasks = batchSizes.map((size, i) => async () => {
       const focusHint = pdfBase64
         ? buildPdfFocusHint(i, numBatches, pdfPageCount)
@@ -86,6 +89,8 @@ exports.handler = async function (event) {
           apiKey, pdfBase64, notes: batchNotes, semesterLabel, deckName, batchSize: size, focusHint
         });
       } catch (e) {
+        console.error('Batch ' + i + ' generation failed:', e && e.message ? e.message : e);
+        if (!firstBatchError) firstBatchError = e && e.message ? e.message : String(e);
         batchCards = []; // one failed batch shouldn't sink the whole job
       }
 
@@ -95,7 +100,12 @@ exports.handler = async function (event) {
           await supabaseInsert('cards', rows, accessToken);
           cardsCreated += batchCards.length;
           await setJobStatus(jobId, accessToken, { cards_created: cardsCreated });
-        } catch (e) { /* keep going even if one insert fails */ }
+        } catch (e) {
+          console.error('Batch ' + i + ' insert failed:', e && e.message ? e.message : e);
+          if (!firstBatchError) firstBatchError = e && e.message ? e.message : String(e);
+        }
+      } else {
+        console.log('Batch ' + i + ' produced 0 cards.');
       }
       return batchCards;
     });
@@ -104,12 +114,15 @@ exports.handler = async function (event) {
     const results = await runWithConcurrency(tasks, effectiveConcurrency);
     const totalCreated = results.reduce((sum, r) => sum + r.length, 0);
 
+    console.log('Job ' + jobId + ' finished: ' + totalCreated + ' cards created.');
+
     if (totalCreated === 0) {
-      throw new Error('Kunne ikke generere nogen kort ud fra materialet.');
+      throw new Error(firstBatchError ? ('Kunne ikke generere kort: ' + firstBatchError) : 'Kunne ikke generere nogen kort ud fra materialet.');
     }
 
     await setJobStatus(jobId, accessToken, { status: 'complete', cards_created: totalCreated });
   } catch (e) {
+    console.error('Job ' + jobId + ' failed:', e && e.message ? e.message : e);
     try {
       await setJobStatus(jobId, accessToken, { status: 'error', error_message: (e.message || 'Ukendt fejl').slice(0, 500) });
     } catch (e2) { /* nothing more we can do */ }
@@ -231,6 +244,10 @@ async function generateBatch({ apiKey, pdfBase64, notes, semesterLabel, deckName
   if (cards.length === 0 && (wasTruncated || raw.length > 0) && retriesLeft > 0 && batchSize > 3) {
     const smallerSize = Math.max(3, Math.ceil(batchSize / 2));
     return generateBatch({ apiKey, pdfBase64, notes, semesterLabel, deckName, batchSize: smallerSize, focusHint }, retriesLeft - 1);
+  }
+
+  if (cards.length === 0) {
+    throw new Error('Kunne ikke laese kort ud af AI-svaret (' + (wasTruncated ? 'svaret blev afskaaret' : 'uventet format') + '). Svar startede med: ' + raw.slice(0, 150));
   }
 
   return cards;
