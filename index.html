@@ -125,6 +125,11 @@
   .feedback-box ul{margin:0;padding-left:18px;font-size:14px;line-height:1.65;color:var(--ink);}
   .feedback-box ul li{margin-bottom:2px;}
 
+  .subjects-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;
+    color:var(--accent);margin-bottom:8px;}
+  .subjects-list{margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:var(--ink);}
+  .subjects-list li{margin-bottom:2px;}
+
   .chart-segment{transition: stroke-dashoffset 1s cubic-bezier(.25,.8,.3,1);}
   .chart-center-n{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;fill:var(--ink);}
   .chart-center-l{font-size:10px;fill:var(--ink);opacity:0.55;letter-spacing:0.04em;}
@@ -318,7 +323,7 @@
     <button class="back-link" onclick="hubBack()"><i class="ti ti-arrow-left"></i><span id="hubBackText">Tilbage til semestre</span></button>
     <h1 id="decksTitle">Vælg sæt</h1>
     <p class="sub" id="decksSub"></p>
-    <p id="decksSubjects" style="font-size:13px;line-height:1.6;opacity:0.75;margin:-10px 0 20px;"></p>
+    <div id="decksSubjects" class="panel" style="display:none;padding:14px 16px;margin:-6px 0 20px;"></div>
 
     <div id="hubMenu">
       <div class="hub-menu-grid">
@@ -696,18 +701,18 @@ const SEMESTERS = {
 // Kandidat: kandidatdelens seneste reform er faktisk fra 2022 (ikke 2024) —
 // emnerne her afspejler den nuværende kandidatstruktur.
 const SEMESTER_SUBJECTS = {
-  b1: 'Lægeliv, sundhedsvæsenet og hjerte-lungeredning · Hoved, hals, bevægeapparatet og embryologi · Tidlig patientkontakt og basal etik',
-  b2: 'Medicinsk celle- og vævsbiologi · Medicinsk dataforståelse · Medicinsk genetik',
-  b3: 'Fordøjelsessystemet og metabolisme · Nervesystemet · Tidligt klinisk ophold og kommunikation',
-  b4: 'Hjerte, lunge, kredsløb, nyre og energiomsætning · Endokrinologi og reproduktion · Basal forskningsmetodologi',
-  b5: 'Immunologi, mikrobiologi og patologi · Farmakologi og innovation · Etik, filosofi, basal sundhedsjura og beslutningslære',
-  b6: 'Psykologi i sundhed og sygdom · Diagnostiske fag og klinisk beslutningsproces · Sygdomslære, diagnostik og behandling · Bachelorprojekt',
-  k1: 'Intern medicin og kirurgi (klinikophold) · Farmakologi · Kardiologi og EKG',
-  k2: 'Anæstesiologi · Intern medicin · Klinisk farmakologi og terapi · Kirurgi',
-  k3: 'Statistik, epidemiologi og medicinsk sociologi · Miljø- og arbejdsmedicin · Akut patient · Oftalmologi · Oto-rhino-laryngologi · Dermato-venerologi',
-  k4: 'Psykiatri · Neurologi og neurokirurgi · Socialmedicin og rehabilitering · Retsmedicin',
-  k5: 'Valgfrit perspektiv (fagligt spor) og udarbejdelse af kandidatspeciale',
-  k6: 'Almen medicin · Pædiatri · Gynækologi og obstetrik'
+  b1: ['Lægeliv, sundhedsvæsenet og hjerte-lungeredning', 'Hoved, hals, bevægeapparatet og embryologi', 'Tidlig patientkontakt og basal etik'],
+  b2: ['Medicinsk celle- og vævsbiologi', 'Medicinsk dataforståelse', 'Medicinsk genetik'],
+  b3: ['Fordøjelsessystemet og metabolisme', 'Nervesystemet', 'Tidligt klinisk ophold og kommunikation'],
+  b4: ['Hjerte, lunge, kredsløb, nyre og energiomsætning', 'Endokrinologi og reproduktion', 'Basal forskningsmetodologi'],
+  b5: ['Immunologi, mikrobiologi og patologi', 'Farmakologi og innovation', 'Etik, filosofi, basal sundhedsjura og beslutningslære'],
+  b6: ['Psykologi i sundhed og sygdom', 'Diagnostiske fag og klinisk beslutningsproces', 'Sygdomslære, diagnostik og behandling', 'Bachelorprojekt'],
+  k1: ['Intern medicin og kirurgi (klinikophold)', 'Farmakologi', 'Kardiologi og EKG'],
+  k2: ['Anæstesiologi', 'Intern medicin', 'Klinisk farmakologi og terapi', 'Kirurgi'],
+  k3: ['Statistik, epidemiologi og medicinsk sociologi', 'Miljø- og arbejdsmedicin', 'Akut patient', 'Oftalmologi', 'Oto-rhino-laryngologi', 'Dermato-venerologi'],
+  k4: ['Psykiatri', 'Neurologi og neurokirurgi', 'Socialmedicin og rehabilitering', 'Retsmedicin'],
+  k5: ['Valgfrit perspektiv (fagligt spor)', 'Udarbejdelse af kandidatspeciale'],
+  k6: ['Almen medicin', 'Pædiatri', 'Gynækologi og obstetrik']
 };
 
 let cards = [];
@@ -765,7 +770,15 @@ function selectSemester(id){
   const group = id.startsWith('b') ? 'Bachelor' : 'Kandidat';
   document.getElementById('decksTitle').textContent = 'Vælg hvad du vil';
   document.getElementById('decksSub').textContent = 'Medicin, KU · ' + group + ' · ' + SEMESTERS[id];
-  document.getElementById('decksSubjects').textContent = SEMESTER_SUBJECTS[id] || '';
+  const subjects = SEMESTER_SUBJECTS[id] || [];
+  const subjectsEl = document.getElementById('decksSubjects');
+  if(subjects.length > 0){
+    subjectsEl.innerHTML = '<div class="subjects-title">Fag på dette semester</div>' +
+      '<ul class="subjects-list">' + subjects.map(s => '<li>' + escapeHtml(s) + '</li>').join('') + '</ul>';
+    subjectsEl.style.display = 'block';
+  }else{
+    subjectsEl.style.display = 'none';
+  }
   document.getElementById('decksErrorBox').innerHTML = '';
   document.getElementById('codeInput').value = '';
   document.getElementById('newDeckName').value = '';
