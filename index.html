@@ -2063,15 +2063,7 @@ async function initAuth(){
 async function init(){
   buildSemesterGrids();
   await initAuth();
-  const savedRaw = localStorage.getItem('cortex_current_deck');
-  if(savedRaw && isConfigured()){
-    try{
-      const saved = JSON.parse(savedRaw);
-      const { data } = await sb.from('decks').select('*').eq('id', saved.id).maybeSingle();
-      if(data){ openDeck(data); return; }
-    }catch(e){}
-    localStorage.removeItem('cortex_current_deck');
-  }
+  localStorage.removeItem('cortex_current_deck');
   renderPrograms();
   showView('home');
 }
