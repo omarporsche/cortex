@@ -282,12 +282,12 @@
       </svg>
     </div>
     <h1 style="text-align:center;">Mit skema</h1>
-    <p class="sub" style="text-align:center;">Dine forelæsninger fra Absalon, samlet med dine egne aftaler</p>
+    <p class="sub" style="text-align:center;">Dine forelæsninger fra din kalender, samlet med dine egne aftaler</p>
 
     <div id="scheduleEventsList"></div>
 
     <a href="#" id="toggleAbsalonPanel" onclick="toggleSchedulePanel('absalon');return false;"
-      style="display:block;text-align:center;font-size:13px;color:var(--accent);margin:20px 0 10px;">+ Forbind Absalon-kalender</a>
+      style="display:block;text-align:center;font-size:13px;color:var(--accent);margin:20px 0 10px;">+ Forbind kalender</a>
     <div id="absalonPanel" style="display:none;">
       <div class="panel">
         <div class="field-group">
@@ -297,17 +297,12 @@
         <button onclick="saveCalendarUrl()">Gem og hent skema</button>
         <div id="calendarUrlStatus"></div>
 
-        <details style="margin-top:16px;">
-          <summary style="cursor:pointer;font-size:13px;color:var(--accent);">Sådan finder du dit kalenderfeed i Absalon</summary>
-          <ol style="font-size:13px;line-height:1.8;margin-top:10px;padding-left:20px;">
-            <li>Log ind på Absalon og gå til <strong>Kalender</strong> i venstre menu</li>
-            <li>Find "Andre kalendere" (Other Calendars) i højre side af kalenderen</li>
-            <li>Klik på <strong>Kalenderfeed</strong> ("Calendar Feed") nederst i den boks</li>
-            <li>Kopiér det link, der vises (starter typisk med <code>webcal://</code> eller <code>https://</code>)</li>
-            <li>Indsæt det i feltet ovenfor, og tryk "Gem og hent skema"</li>
-          </ol>
-          <p style="font-size:12px;opacity:0.6;margin-top:8px;">Absalon er bygget på Canvas, så trinene ligner den generelle Canvas-opsætning — hedder noget en anelse andet hos jer, så led efter "Kalenderfeed" eller "Calendar Feed".</p>
-        </details>
+        <p style="font-size:13px;margin-top:14px;">
+          <a href="https://it.ku.dk/studerende/skema/" target="_blank" rel="noopener" style="color:var(--accent);">
+            Find dit skema og kalenderfeed <i class="ti ti-external-link" style="font-size:13px;vertical-align:-1px;"></i>
+          </a>
+          — KU's officielle side om skema.ku.dk, KUnet og appen MyUCPH. Kig efter en "eksportér"/"abonnér"/"kalenderfeed"-mulighed, når du er inde på dit skema.
+        </p>
       </div>
     </div>
 
@@ -1277,7 +1272,7 @@ let scheduleManualEvents = [];
 function openSchedule(){
   if(!currentUser){ openAuthView(); return; }
   document.getElementById('absalonPanel').style.display = 'none';
-  document.getElementById('toggleAbsalonPanel').textContent = '+ Forbind Absalon-kalender';
+  document.getElementById('toggleAbsalonPanel').textContent = '+ Forbind kalender';
   document.getElementById('addEventPanel').style.display = 'none';
   document.getElementById('toggleAddEventPanel').textContent = '+ Tilføj egen aftale';
   document.getElementById('calendarUrlStatus').innerHTML = '';
@@ -1289,7 +1284,7 @@ function openSchedule(){
 function toggleSchedulePanel(which){
   const panelId = which === 'absalon' ? 'absalonPanel' : 'addEventPanel';
   const btnId = which === 'absalon' ? 'toggleAbsalonPanel' : 'toggleAddEventPanel';
-  const openLabel = which === 'absalon' ? '+ Forbind Absalon-kalender' : '+ Tilføj egen aftale';
+  const openLabel = which === 'absalon' ? '+ Forbind kalender' : '+ Tilføj egen aftale';
   const panel = document.getElementById(panelId);
   const isOpen = panel.style.display === 'block';
   panel.style.display = isOpen ? 'none' : 'block';
@@ -1340,7 +1335,7 @@ function renderScheduleList(){
   combined.sort((a, b) => new Date(a.start) - new Date(b.start));
 
   if(combined.length === 0){
-    listEl.innerHTML = '<div class="empty">Ingen kommende aftaler endnu. Forbind din Absalon-kalender, eller tilføj en aftale nedenfor.</div>';
+    listEl.innerHTML = '<div class="empty">Ingen kommende aftaler endnu. Forbind din kalender, eller tilføj en aftale nedenfor.</div>';
     return;
   }
 
@@ -1349,7 +1344,7 @@ function renderScheduleList(){
     const dateStr = d.toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' });
     const timeStr = d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
     const badge = e.source === 'absalon'
-      ? '<span style="font-size:10px;background:var(--accent-light);color:var(--accent);padding:2px 7px;border-radius:20px;white-space:nowrap;">Absalon</span>'
+      ? '<span style="font-size:10px;background:var(--accent-light);color:var(--accent);padding:2px 7px;border-radius:20px;white-space:nowrap;">Kalender</span>'
       : '<span style="font-size:10px;background:var(--warn-light);color:var(--warn);padding:2px 7px;border-radius:20px;white-space:nowrap;">Egen aftale</span>';
     const deleteBtn = (e.source === 'manual' && e.id)
       ? '<div style="margin-top:6px;"><button class="icon-btn" onclick="deleteScheduleEvent(\'' + e.id + '\')" title="Slet"><i class="ti ti-trash"></i></button></div>'
