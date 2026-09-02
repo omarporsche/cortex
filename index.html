@@ -130,6 +130,24 @@
   .subjects-list{margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:var(--ink);}
   .subjects-list li{margin-bottom:2px;}
 
+  .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .cal-month-label{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:16px;text-transform:capitalize;}
+  .cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:10.5px;
+    opacity:0.5;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:4px;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+  .cal-cell{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border-radius:10px;cursor:pointer;font-size:13px;background:var(--card);
+    border:1px solid transparent;transition:border-color 0.15s ease;color:var(--ink);}
+  .cal-cell:hover{border-color:var(--line);}
+  .cal-cell-empty{background:none;cursor:default;}
+  .cal-cell-today .cal-daynum{color:var(--accent);font-weight:700;}
+  .cal-cell-selected{background:var(--accent-light);border-color:var(--accent);}
+  .cal-daynum{line-height:1;}
+  .cal-dots{display:flex;gap:2px;margin-top:3px;height:5px;}
+  .cal-dot{width:5px;height:5px;border-radius:50%;}
+  .cal-dot-absalon{background:var(--accent);}
+  .cal-dot-manual{background:var(--warn);}
+
   .chart-segment{transition: stroke-dashoffset 1s cubic-bezier(.25,.8,.3,1);}
   .chart-center-n{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:28px;fill:var(--ink);}
   .chart-center-l{font-size:10px;fill:var(--ink);opacity:0.55;letter-spacing:0.04em;}
@@ -284,6 +302,17 @@
     <h1 style="text-align:center;">Mit skema</h1>
     <p class="sub" style="text-align:center;">Dine forelæsninger fra din kalender, samlet med dine egne aftaler</p>
 
+    <div class="cal-header">
+      <button class="icon-btn" onclick="changeCalendarMonth(-1)" title="Forrige måned"><i class="ti ti-chevron-left"></i></button>
+      <div id="calendarMonthLabel" class="cal-month-label"></div>
+      <button class="icon-btn" onclick="changeCalendarMonth(1)" title="Næste måned"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div class="cal-weekdays">
+      <span>Man</span><span>Tir</span><span>Ons</span><span>Tor</span><span>Fre</span><span>Lør</span><span>Søn</span>
+    </div>
+    <div class="cal-grid" id="calendarGrid"></div>
+
+    <h3 id="calendarDayLabel" style="font-size:14px;font-weight:600;margin:22px 0 10px;"></h3>
     <div id="scheduleEventsList"></div>
 
     <a href="#" id="toggleAbsalonPanel" onclick="toggleSchedulePanel('absalon');return false;"
@@ -1269,6 +1298,10 @@ async function loadStudyStats(){
 let scheduleAbsalonEvents = [];
 let scheduleManualEvents = [];
 
+let scheduleCombinedEvents = [];
+let calendarViewDate = new Date();
+let calendarSelectedDate = new Date();
+
 function openSchedule(){
   if(!currentUser){ openAuthView(); return; }
   document.getElementById('absalonPanel').style.display = 'none';
@@ -1277,6 +1310,8 @@ function openSchedule(){
   document.getElementById('toggleAddEventPanel').textContent = '+ Tilføj egen aftale';
   document.getElementById('calendarUrlStatus').innerHTML = '';
   document.getElementById('addEventErrorBox').innerHTML = '';
+  calendarViewDate = new Date();
+  calendarSelectedDate = new Date();
   showView('schedule');
   loadSchedule();
 }
@@ -1317,31 +1352,112 @@ async function loadSchedule(){
         if(resp.ok && Array.isArray(data.events)){
           scheduleAbsalonEvents = data.events;
         }
-      }catch(e){ /* keep manual events showing even if Absalon fetch fails */ }
+      }catch(e){ /* keep manual events showing even if the calendar fetch fails */ }
     }
 
-    renderScheduleList();
+    normalizeScheduleEvents();
+    renderCalendarGrid();
+    renderDayEvents(calendarSelectedDate);
   }catch(e){
     listEl.innerHTML = '<div class="error">Kunne ikke hente dit skema: ' + (e.message || 'ukendt fejl') + '</div>';
   }
 }
 
-function renderScheduleList(){
-  const listEl = document.getElementById('scheduleEventsList');
-  const combined = [
+function normalizeScheduleEvents(){
+  scheduleCombinedEvents = [
     ...scheduleAbsalonEvents.map(e => ({ title: e.title, location: e.location, start: e.start, source: 'absalon' })),
     ...scheduleManualEvents.map(e => ({ id: e.id, title: e.title, location: e.location, start: e.starts_at, source: 'manual' }))
   ];
-  combined.sort((a, b) => new Date(a.start) - new Date(b.start));
+  scheduleCombinedEvents.sort((a, b) => new Date(a.start) - new Date(b.start));
+}
 
-  if(combined.length === 0){
-    listEl.innerHTML = '<div class="empty">Ingen kommende aftaler endnu. Forbind din kalender, eller tilføj en aftale nedenfor.</div>';
+function dateKey(d){
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return yyyy + '-' + mm + '-' + dd;
+}
+
+function changeCalendarMonth(delta){
+  calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + delta, 1);
+  renderCalendarGrid();
+}
+
+function renderCalendarGrid(){
+  const monthNames = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth();
+
+  document.getElementById('calendarMonthLabel').textContent = monthNames[month] + ' ' + year;
+
+  const dayMarks = {};
+  scheduleCombinedEvents.forEach(e => {
+    const d = new Date(e.start);
+    if(isNaN(d.getTime())) return;
+    const key = dateKey(d);
+    if(!dayMarks[key]) dayMarks[key] = { absalon: false, manual: false };
+    dayMarks[key][e.source] = true;
+  });
+
+  const firstOfMonth = new Date(year, month, 1);
+  const startOffset = (firstOfMonth.getDay() + 6) % 7; // Monday-first grid
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const todayKey = dateKey(new Date());
+  const selectedKey = dateKey(calendarSelectedDate);
+
+  let cells = '';
+  for(let i = 0; i < startOffset; i++){
+    cells += '<div class="cal-cell cal-cell-empty"></div>';
+  }
+  for(let day = 1; day <= daysInMonth; day++){
+    const key = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    const marks = dayMarks[key];
+    let dotHtml = '<div class="cal-dots"></div>';
+    if(marks){
+      dotHtml = '<div class="cal-dots">' +
+        (marks.absalon ? '<span class="cal-dot cal-dot-absalon"></span>' : '') +
+        (marks.manual ? '<span class="cal-dot cal-dot-manual"></span>' : '') +
+        '</div>';
+    }
+    const classes = ['cal-cell'];
+    if(key === todayKey) classes.push('cal-cell-today');
+    if(key === selectedKey) classes.push('cal-cell-selected');
+    cells += '<div class="' + classes.join(' ') + '" onclick="selectCalendarDay(\'' + key + '\')">' +
+      '<span class="cal-daynum">' + day + '</span>' + dotHtml +
+    '</div>';
+  }
+
+  document.getElementById('calendarGrid').innerHTML = cells;
+}
+
+function selectCalendarDay(key){
+  const parts = key.split('-').map(Number);
+  calendarSelectedDate = new Date(parts[0], parts[1] - 1, parts[2]);
+  renderCalendarGrid();
+  renderDayEvents(calendarSelectedDate);
+}
+
+function renderDayEvents(date){
+  const key = dateKey(date);
+  const dayNames = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
+  const monthAbbr = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+  document.getElementById('calendarDayLabel').textContent =
+    dayNames[date.getDay()] + ' ' + date.getDate() + '. ' + monthAbbr[date.getMonth()];
+
+  const dayEvents = scheduleCombinedEvents.filter(e => {
+    const d = new Date(e.start);
+    return !isNaN(d.getTime()) && dateKey(d) === key;
+  });
+
+  const listEl = document.getElementById('scheduleEventsList');
+  if(dayEvents.length === 0){
+    listEl.innerHTML = '<div class="empty">Ingen aftaler denne dag.</div>';
     return;
   }
 
-  listEl.innerHTML = combined.map(e => {
+  listEl.innerHTML = dayEvents.map(e => {
     const d = new Date(e.start);
-    const dateStr = d.toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' });
     const timeStr = d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
     const badge = e.source === 'absalon'
       ? '<span style="font-size:10px;background:var(--accent-light);color:var(--accent);padding:2px 7px;border-radius:20px;white-space:nowrap;">Kalender</span>'
@@ -1354,11 +1470,12 @@ function renderScheduleList(){
         '<div class="name" style="font-size:14px;">' + escapeHtml(e.title || 'Uden titel') + '</div>' +
         badge +
       '</div>' +
-      '<div class="meta">' + dateStr + ' &middot; ' + timeStr + (e.location ? (' &middot; ' + escapeHtml(e.location)) : '') + '</div>' +
+      '<div class="meta">' + timeStr + (e.location ? (' &middot; ' + escapeHtml(e.location)) : '') + '</div>' +
       deleteBtn +
     '</div>';
   }).join('');
 }
+
 
 async function saveCalendarUrl(){
   const statusEl = document.getElementById('calendarUrlStatus');
