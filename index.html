@@ -265,6 +265,78 @@
     </div>
   </div>
 
+  <!-- VIEW: SCHEDULE -->
+  <div id="view-schedule" style="display:none;">
+    <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
+    <div class="auth-icon">
+      <svg viewBox="0 0 24 24" width="22" height="22">
+        <rect x="2" y="4" width="20" height="18" rx="2" fill="#3E6FA8"/>
+        <rect x="2" y="4" width="20" height="5" rx="2" fill="#F2B84B"/>
+        <rect x="6" y="1" width="2" height="5" rx="1" fill="#2B2A25"/>
+        <rect x="16" y="1" width="2" height="5" rx="1" fill="#2B2A25"/>
+        <rect x="6" y="12" width="3" height="3" fill="#F5F1E8"/>
+        <rect x="10.5" y="12" width="3" height="3" fill="#F5F1E8"/>
+        <rect x="15" y="12" width="3" height="3" fill="#F5F1E8"/>
+        <rect x="6" y="16.5" width="3" height="3" fill="#F5F1E8"/>
+        <rect x="10.5" y="16.5" width="3" height="3" fill="#F5F1E8"/>
+      </svg>
+    </div>
+    <h1 style="text-align:center;">Mit skema</h1>
+    <p class="sub" style="text-align:center;">Dine forelæsninger fra Absalon, samlet med dine egne aftaler</p>
+
+    <div id="scheduleEventsList"></div>
+
+    <a href="#" id="toggleAbsalonPanel" onclick="toggleSchedulePanel('absalon');return false;"
+      style="display:block;text-align:center;font-size:13px;color:var(--accent);margin:20px 0 10px;">+ Forbind Absalon-kalender</a>
+    <div id="absalonPanel" style="display:none;">
+      <div class="panel">
+        <div class="field-group">
+          <label class="field-label" for="calendarUrlInput">Kalenderfeed-URL</label>
+          <input class="input" type="text" id="calendarUrlInput" placeholder="https://absalon.ku.dk/feeds/calendars/...">
+        </div>
+        <button onclick="saveCalendarUrl()">Gem og hent skema</button>
+        <div id="calendarUrlStatus"></div>
+
+        <details style="margin-top:16px;">
+          <summary style="cursor:pointer;font-size:13px;color:var(--accent);">Sådan finder du dit kalenderfeed i Absalon</summary>
+          <ol style="font-size:13px;line-height:1.8;margin-top:10px;padding-left:20px;">
+            <li>Log ind på Absalon og gå til <strong>Kalender</strong> i venstre menu</li>
+            <li>Find "Andre kalendere" (Other Calendars) i højre side af kalenderen</li>
+            <li>Klik på <strong>Kalenderfeed</strong> ("Calendar Feed") nederst i den boks</li>
+            <li>Kopiér det link, der vises (starter typisk med <code>webcal://</code> eller <code>https://</code>)</li>
+            <li>Indsæt det i feltet ovenfor, og tryk "Gem og hent skema"</li>
+          </ol>
+          <p style="font-size:12px;opacity:0.6;margin-top:8px;">Absalon er bygget på Canvas, så trinene ligner den generelle Canvas-opsætning — hedder noget en anelse andet hos jer, så led efter "Kalenderfeed" eller "Calendar Feed".</p>
+        </details>
+      </div>
+    </div>
+
+    <a href="#" id="toggleAddEventPanel" onclick="toggleSchedulePanel('addEvent');return false;"
+      style="display:block;text-align:center;font-size:13px;color:var(--accent);margin:14px 0 10px;">+ Tilføj egen aftale</a>
+    <div id="addEventPanel" style="display:none;">
+      <div class="panel">
+        <div class="field-group">
+          <label class="field-label" for="eventTitle">Titel</label>
+          <input class="input" type="text" id="eventTitle" placeholder="Fx Øvelse i histologi">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="eventLocation">Sted (valgfrit)</label>
+          <input class="input" type="text" id="eventLocation" placeholder="Fx Panum, lokale 12.1.1">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="eventStart">Starttidspunkt</label>
+          <input class="input" type="datetime-local" id="eventStart">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="eventEnd">Sluttidspunkt (valgfrit)</label>
+          <input class="input" type="datetime-local" id="eventEnd">
+        </div>
+        <button onclick="submitScheduleEvent()">Tilføj til skema</button>
+        <div id="addEventErrorBox"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- VIEW: PROFILE -->
   <div id="view-profile" style="display:none;">
     <button class="back-link" onclick="goHome()"><i class="ti ti-arrow-left"></i>Tilbage til forsiden</button>
@@ -733,7 +805,7 @@ function buildSemesterGrids(){
     '<span class="sem-num">' + (i + 1) + '</span><span class="sem-label">semester</span></button>').join('');
 }
 
-const ALL_VIEWS = ['home','auth','onboarding','profile','semester','hub','browse','app','review','review-results','about','contact','privacy','terms'];
+const ALL_VIEWS = ['home','auth','onboarding','profile','schedule','semester','hub','browse','app','review','review-results','about','contact','privacy','terms'];
 
 function showView(name){
   ALL_VIEWS.forEach(v => {
@@ -967,6 +1039,7 @@ function renderAuthBar(){
     const fullName = (currentProfile && currentProfile.full_name) ? currentProfile.full_name : currentUser.email;
     const firstName = fullName.split(' ')[0];
     bar.innerHTML = randomGreeting() + ', ' + escapeHtml(firstName) + '!' +
+      ' &middot; <a href="#" onclick="openSchedule();return false;" style="color:var(--accent);">Mit skema</a>' +
       ' &middot; <a href="#" onclick="openProfileView();return false;" style="color:var(--accent);">Min profil</a>' +
       ' &middot; <a href="#" onclick="logOut();return false;" style="color:var(--accent);">Log ud</a>';
   }else{
@@ -1195,6 +1268,155 @@ async function loadStudyStats(){
   }catch(e){
     statsEl.style.display = 'none';
   }
+}
+
+// ---- Schedule (Absalon calendar feed + manual entries) ----
+let scheduleAbsalonEvents = [];
+let scheduleManualEvents = [];
+
+function openSchedule(){
+  if(!currentUser){ openAuthView(); return; }
+  document.getElementById('absalonPanel').style.display = 'none';
+  document.getElementById('toggleAbsalonPanel').textContent = '+ Forbind Absalon-kalender';
+  document.getElementById('addEventPanel').style.display = 'none';
+  document.getElementById('toggleAddEventPanel').textContent = '+ Tilføj egen aftale';
+  document.getElementById('calendarUrlStatus').innerHTML = '';
+  document.getElementById('addEventErrorBox').innerHTML = '';
+  showView('schedule');
+  loadSchedule();
+}
+
+function toggleSchedulePanel(which){
+  const panelId = which === 'absalon' ? 'absalonPanel' : 'addEventPanel';
+  const btnId = which === 'absalon' ? 'toggleAbsalonPanel' : 'toggleAddEventPanel';
+  const openLabel = which === 'absalon' ? '+ Forbind Absalon-kalender' : '+ Tilføj egen aftale';
+  const panel = document.getElementById(panelId);
+  const isOpen = panel.style.display === 'block';
+  panel.style.display = isOpen ? 'none' : 'block';
+  document.getElementById(btnId).textContent = isOpen ? openLabel : '– Skjul';
+}
+
+async function loadSchedule(){
+  const listEl = document.getElementById('scheduleEventsList');
+  listEl.innerHTML = '<div class="empty">Henter...</div>';
+  if(!isConfigured()){ listEl.innerHTML = configWarning(); return; }
+
+  try{
+    const { data: settings } = await sb.from('user_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
+    const savedUrl = settings ? settings.calendar_feed_url : '';
+    document.getElementById('calendarUrlInput').value = savedUrl || '';
+
+    const { data: manual } = await sb.from('schedule_events').select('*')
+      .eq('user_id', currentUser.id).order('starts_at', { ascending: true });
+    scheduleManualEvents = manual || [];
+
+    scheduleAbsalonEvents = [];
+    if(savedUrl){
+      try{
+        const resp = await fetch('/.netlify/functions/fetch-calendar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ calendarUrl: savedUrl })
+        });
+        const data = await resp.json();
+        if(resp.ok && Array.isArray(data.events)){
+          scheduleAbsalonEvents = data.events;
+        }
+      }catch(e){ /* keep manual events showing even if Absalon fetch fails */ }
+    }
+
+    renderScheduleList();
+  }catch(e){
+    listEl.innerHTML = '<div class="error">Kunne ikke hente dit skema: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+function renderScheduleList(){
+  const listEl = document.getElementById('scheduleEventsList');
+  const combined = [
+    ...scheduleAbsalonEvents.map(e => ({ title: e.title, location: e.location, start: e.start, source: 'absalon' })),
+    ...scheduleManualEvents.map(e => ({ id: e.id, title: e.title, location: e.location, start: e.starts_at, source: 'manual' }))
+  ];
+  combined.sort((a, b) => new Date(a.start) - new Date(b.start));
+
+  if(combined.length === 0){
+    listEl.innerHTML = '<div class="empty">Ingen kommende aftaler endnu. Forbind din Absalon-kalender, eller tilføj en aftale nedenfor.</div>';
+    return;
+  }
+
+  listEl.innerHTML = combined.map(e => {
+    const d = new Date(e.start);
+    const dateStr = d.toLocaleDateString('da-DK', { weekday: 'short', day: 'numeric', month: 'short' });
+    const timeStr = d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
+    const badge = e.source === 'absalon'
+      ? '<span style="font-size:10px;background:var(--accent-light);color:var(--accent);padding:2px 7px;border-radius:20px;white-space:nowrap;">Absalon</span>'
+      : '<span style="font-size:10px;background:var(--warn-light);color:var(--warn);padding:2px 7px;border-radius:20px;white-space:nowrap;">Egen aftale</span>';
+    const deleteBtn = (e.source === 'manual' && e.id)
+      ? '<div style="margin-top:6px;"><button class="icon-btn" onclick="deleteScheduleEvent(\'' + e.id + '\')" title="Slet"><i class="ti ti-trash"></i></button></div>'
+      : '';
+    return '<div class="browse-card" style="cursor:default;padding:14px 16px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">' +
+        '<div class="name" style="font-size:14px;">' + escapeHtml(e.title || 'Uden titel') + '</div>' +
+        badge +
+      '</div>' +
+      '<div class="meta">' + dateStr + ' &middot; ' + timeStr + (e.location ? (' &middot; ' + escapeHtml(e.location)) : '') + '</div>' +
+      deleteBtn +
+    '</div>';
+  }).join('');
+}
+
+async function saveCalendarUrl(){
+  const statusEl = document.getElementById('calendarUrlStatus');
+  statusEl.innerHTML = '';
+  const url = document.getElementById('calendarUrlInput').value.trim();
+  if(!url){ statusEl.innerHTML = '<div class="error">Indsæt en kalender-URL.</div>'; return; }
+
+  statusEl.innerHTML = '<div class="status">Henter og gemmer...</div>';
+  try{
+    const { error } = await sb.from('user_settings').upsert({ user_id: currentUser.id, calendar_feed_url: url });
+    if(error) throw error;
+    await loadSchedule();
+    statusEl.innerHTML = '<div class="status">Kalender forbundet og hentet.</div>';
+  }catch(e){
+    statusEl.innerHTML = '<div class="error">Kunne ikke gemme: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+async function submitScheduleEvent(){
+  const errBox = document.getElementById('addEventErrorBox');
+  errBox.innerHTML = '';
+  const title = document.getElementById('eventTitle').value.trim();
+  const location = document.getElementById('eventLocation').value.trim();
+  const startRaw = document.getElementById('eventStart').value;
+  const endRaw = document.getElementById('eventEnd').value;
+
+  if(!title){ errBox.innerHTML = '<div class="error">Angiv en titel.</div>'; return; }
+  if(!startRaw){ errBox.innerHTML = '<div class="error">Angiv et starttidspunkt.</div>'; return; }
+
+  try{
+    const { error } = await sb.from('schedule_events').insert({
+      user_id: currentUser.id,
+      title: title,
+      location: location || null,
+      starts_at: new Date(startRaw).toISOString(),
+      ends_at: endRaw ? new Date(endRaw).toISOString() : null
+    });
+    if(error) throw error;
+    document.getElementById('eventTitle').value = '';
+    document.getElementById('eventLocation').value = '';
+    document.getElementById('eventStart').value = '';
+    document.getElementById('eventEnd').value = '';
+    await loadSchedule();
+  }catch(e){
+    errBox.innerHTML = '<div class="error">Kunne ikke tilføje: ' + (e.message || 'ukendt fejl') + '</div>';
+  }
+}
+
+async function deleteScheduleEvent(id){
+  try{
+    await sb.from('schedule_events').delete().eq('id', id);
+    await loadSchedule();
+  }catch(e){}
 }
 
 async function saveProfile(){
